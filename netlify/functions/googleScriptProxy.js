@@ -3,7 +3,7 @@
 const https = require("https");
 
 // URL do seu script do Google. Mantenha em um só lugar para fácil manutenção.
-const GOOGLE_SCRIPT_URL = new URL("https://script.google.com/macros/s/AKfycbzi6LIOwoUYvIAMzTCzA_Yv1eEuA_tKpehaqOt-WGYSuiaj8VwTkBkV2cnV2iIxtsgI/exec");
+const GOOGLE_SCRIPT_URL = new URL("https://script.google.com/macros/s/AKfycbyGPwkyGQM3dlysFwKSA7yhcdIkMP4r05vnRDo-luY0EWd5ah15EaFTNrDCJM4DlzlL/exec");
 
 exports.handler = async function (event, context) {
   
