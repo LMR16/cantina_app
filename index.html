@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Proxy Teste</title>
+</head>
+<body>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const SCRIPT_URL = "/.netlify/functions/googleScriptProxy";
+
+      fetch(SCRIPT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action: "createProduct", payload: { Nome: "Teste", Preco: 9.99 } })
+      })
+      .then(res => res.json())
+      .then(data => console.log("Resposta:", data))
+      .catch(err => console.error("Erro:", err));
+    });
+  </script>
+</body>
+</html>
