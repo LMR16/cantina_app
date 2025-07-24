@@ -212,27 +212,45 @@
                 itens_venda: []
             };
 
+            // SUBSTITUA A FUNÇÃO ANTIGA POR ESTA
             async function fetchData() {
                 showLoading(true);
-                try {
-                    const [produtosRes, categoriasRes, imagensRes, vendasRes, itensVendaRes] = await Promise.all([
-                        fetch(`${SCRIPT_URL}?sheet=produtos`),
-                        fetch(`${SCRIPT_URL}?sheet=categorias`),
-                        fetch(`${SCRIPT_URL}?sheet=imagens`),
-                        fetch(`${SCRIPT_URL}?sheet=vendas`),
-                        fetch(`${SCRIPT_URL}?sheet=itens_venda`)
-                    ]);
 
-                    DB.produtos = await produtosRes.json();
-                    DB.categorias = await categoriasRes.json();
-                    DB.imagens = await imagensRes.json();
-                    DB.vendas = await vendasRes.json();
-                    DB.itens_venda = await itensVendaRes.json();
+                // Helper para processar a resposta e dar erros detalhados
+                const processResponse = async (response, sheetName) => {
+                    if (!response.ok) {
+                        // Se a resposta não for OK (ex: status 404, 500, ou um redirecionamento),
+                        // vamos ler o corpo como texto e lançar um erro detalhado.
+                        const errorText = await response.text();
+                        throw new Error(`Falha ao buscar a aba '${sheetName}'. Status: ${response.status}. Resposta: ${errorText}`);
+                    }
+                    // Se a resposta for OK, tenta processar como JSON.
+                    return response.json().catch(err => {
+                        console.error(`Erro ao processar JSON da aba '${sheetName}'.`, err);
+                        throw new Error(`A resposta para a aba '${sheetName}' não é um JSON válido.`);
+                    });
+                };
+
+                try {
+                    const sheetsToFetch = ['produtos', 'categorias', 'imagens', 'vendas', 'itens_venda'];
+                    const fetchPromises = sheetsToFetch.map(sheet => 
+                        fetch(`${SCRIPT_URL}?sheet=${sheet}`).then(res => processResponse(res, sheet))
+                    );
                     
-                    renderCurrentView(); 
+                    const [produtos, categorias, imagens, vendas, itensVenda] = await Promise.all(fetchPromises);
+
+                    DB.produtos = produtos;
+                    DB.categorias = categorias;
+                    DB.imagens = imagens;
+                    DB.vendas = vendas;
+                    DB.itens_venda = itensVenda;
+                    
+                    renderCurrentView();
+
                 } catch (error) {
-                    console.error("Erro ao buscar dados:", error);
-                    alert("Não foi possível carregar os dados da planilha. Verifique sua conexão e a URL do script.");
+                    // Agora o erro exibido será muito mais específico!
+                    console.error("Erro detalhado ao buscar dados:", error);
+                    alert("Ocorreu um erro ao carregar os dados. Verifique o console do navegador (F12) para mais detalhes.");
                 } finally {
                     showLoading(false);
                 }
