@@ -8,16 +8,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- 
-        Chosen Palette: Warm Neutrals (bg-stone-50, bg-white, text-stone-800, accent text-orange-600)
-        
-        Application Structure Plan: A tab-based Single Page Application (SPA) with four main sections: 
-        1. 'Painel Diário': A dashboard for at-a-glance daily metrics. This is the landing page for quick insights.
-        2. 'Registrar Venda': A task-oriented "shopping cart" interface for rapid order entry, which was a key user requirement for practicality.
-        3. 'Produtos': A catalog management view with tabs to filter between "Active" and "Inactive" products, simplifying inventory management.
-        4. 'Histórico': An exploratory, accordion-style drill-down report view, allowing users to navigate from yearly summaries down to individual sales.
-        This structure was chosen to separate distinct user tasks (viewing, creating, managing, analyzing) into clear, focused sections, improving usability.
-    -->
     <style>
         body { font-family: 'Inter', sans-serif; }
         .tab-btn.active {
@@ -29,8 +19,8 @@
             overflow: hidden;
             transition: max-height 0.3s ease-out;
         }
-        .accordion-item.open .accordion-content {
-            max-height: 1000px; /* Adjust as needed */
+        .accordion-item.open > .accordion-content {
+            max-height: 5000px; /* Increased max-height for large content */
             transition: max-height 0.5s ease-in;
         }
         .loader {
@@ -91,7 +81,6 @@
                 <div class="mt-8 bg-white p-6 rounded-xl shadow-sm border border-stone-100">
                     <h3 class="text-lg font-medium text-stone-800">Últimas 5 Vendas</h3>
                     <div id="ultimas-vendas-container" class="mt-4 space-y-3">
-                        <!-- Vendas serão inseridas aqui -->
                         <p class="text-stone-500">Carregando vendas...</p>
                     </div>
                 </div>
@@ -99,26 +88,20 @@
 
             <!-- Aba: Registrar Venda -->
             <div id="registrar-venda" class="tab-content hidden">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <!-- Coluna de Produtos -->
+                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div class="lg:col-span-2">
                         <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-100">
                             <h3 class="text-lg font-medium text-stone-800">Selecione os Produtos</h3>
                             <div class="my-4">
                                 <input type="text" id="search-product-input" placeholder="Buscar produto por nome..." class="w-full rounded-md border-stone-300 shadow-sm focus:border-orange-500 focus:ring-orange-500">
                             </div>
-                            <div id="product-list-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-4 max-h-[60vh] overflow-y-auto p-2">
-                                <!-- Produtos para venda serão carregados aqui -->
-                            </div>
+                            <div id="product-list-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-4 max-h-[60vh] overflow-y-auto p-2"></div>
                         </div>
                     </div>
-
-                    <!-- Coluna do Carrinho -->
                     <div>
                         <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-100 sticky top-8">
                             <h3 class="text-lg font-medium text-stone-800">Carrinho</h3>
                             <div class="mt-4 space-y-3" id="cart-items-container">
-                                <!-- Itens do carrinho aqui -->
                                 <p class="text-stone-500">O carrinho está vazio.</p>
                             </div>
                             <div class="mt-6 border-t pt-4">
@@ -159,9 +142,7 @@
                         <h2 class="text-xl font-bold text-stone-800">Gerenciar Produtos</h2>
                         <button id="add-product-btn" class="bg-orange-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-orange-700 transition-colors">Adicionar Produto</button>
                     </div>
-                    <div id="product-management-container">
-                        <!-- Tabela de produtos será inserida aqui -->
-                    </div>
+                    <div id="product-management-container"></div>
                 </div>
             </div>
 
@@ -169,16 +150,14 @@
             <div id="historico" class="tab-content hidden">
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-100">
                     <h2 class="text-xl font-bold text-stone-800 mb-4">Histórico de Vendas</h2>
-                    <div id="sales-history-container" class="space-y-2">
-                        <!-- Histórico em formato accordion será inserido aqui -->
-                    </div>
+                    <div id="sales-history-container" class="space-y-2"></div>
                 </div>
             </div>
         </main>
     </div>
 
     <!-- Modal de Adicionar/Editar Produto -->
-    <div id="product-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div id="product-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
         <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
             <h2 id="modal-title" class="text-2xl font-bold mb-6">Adicionar Novo Produto</h2>
             <form id="product-form">
@@ -190,9 +169,7 @@
                     </div>
                     <div>
                         <label for="produto-categoria" class="block text-sm font-medium text-stone-700">Categoria</label>
-                        <select id="produto-categoria" required class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-orange-500 focus:ring-orange-500">
-                            <!-- Categorias carregadas aqui -->
-                        </select>
+                        <select id="produto-categoria" required class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-orange-500 focus:ring-orange-500"></select>
                     </div>
                     <div>
                         <label for="produto-preco" class="block text-sm font-medium text-stone-700">Preço (R$)</label>
@@ -211,8 +188,45 @@
         </div>
     </div>
     
+    <!-- NOVO: Modal de Editar Venda -->
+    <div id="sale-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg">
+            <h2 id="sale-modal-title" class="text-2xl font-bold mb-6">Editar Venda</h2>
+            <form id="sale-form">
+                <input type="hidden" id="sale-id">
+                <div class="space-y-4">
+                    <div>
+                        <label for="sale-metodo-pagamento" class="block text-sm font-medium text-stone-700">Método de Pagamento</label>
+                        <select id="sale-metodo-pagamento" class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm">
+                            <option>PIX</option>
+                            <option>Cartão</option>
+                            <option>Dinheiro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="sale-turno" class="block text-sm font-medium text-stone-700">Turno</label>
+                        <select id="sale-turno" class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm">
+                            <option>Manhã</option>
+                            <option>Noite</option>
+                        </select>
+                    </div>
+                    <div class="border-t pt-4">
+                        <h3 class="text-sm font-medium text-stone-700">Itens da Venda</h3>
+                        <div id="sale-items-details" class="mt-2 text-sm text-stone-600 space-y-1">
+                            <!-- Detalhes dos itens da venda serão populados aqui -->
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-8 flex justify-end space-x-3">
+                    <button type="button" id="cancel-sale-btn" class="bg-stone-200 text-stone-800 py-2 px-4 rounded-lg hover:bg-stone-300">Cancelar</button>
+                    <button type="submit" class="bg-orange-600 text-white py-2 px-4 rounded-lg hover:bg-orange-700">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Modal de Confirmação -->
-    <div id="confirmation-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div id="confirmation-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
         <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm">
             <h2 id="confirmation-title" class="text-lg font-bold mb-4">Confirmar Ação</h2>
             <p id="confirmation-message" class="text-stone-600 mb-6">Você tem certeza?</p>
@@ -268,14 +282,13 @@
                 allSales = sales;
                 allSaleItems = saleItems;
 
-                // Após carregar todos os dados, atualiza a UI
                 updateDashboard();
                 populateProductsForSale();
                 populateCategoryFilter();
                 
             } catch (error) {
                 console.error("Erro ao carregar dados iniciais:", error);
-                showToast("Falha ao carregar dados. Tente recarregar a página.", "error");
+                showToast("Falha ao carregar dados. Verifique a conexão e as configurações do script.", "error");
             } finally {
                 showGlobalLoader(false);
             }
@@ -284,17 +297,13 @@
         async function fetchData(sheetName) {
             try {
                 const response = await fetch(`${SCRIPT_URL}?sheet=${sheetName}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
-                if(data.status === 'error') {
-                    throw new Error(`API Error: ${data.message}`);
-                }
+                if(data.status === 'error') throw new Error(`API Error: ${data.message}`);
                 return data;
             } catch (error) {
                 console.error(`Erro ao buscar dados da aba '${sheetName}':`, error);
-                throw error; // Re-throw para ser pego pelo Promise.all
+                throw error;
             }
         }
         
@@ -302,69 +311,38 @@
         // LÓGICA DAS ABAS E UI
         // =================================================================
         function showTab(tabName) {
-            // Esconde todos os conteúdos
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.add('hidden');
-            });
-            // Desativa todos os botões
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('active', 'bg-orange-600', 'text-white');
-                btn.classList.add('text-stone-600', 'hover:bg-stone-200');
-            });
-
-            // Mostra o conteúdo da aba selecionada
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(tabName).classList.remove('hidden');
-            // Ativa o botão da aba selecionada
-            const activeButton = document.querySelector(`[onclick="showTab('${tabName}')"]`);
-            activeButton.classList.add('active', 'bg-orange-600', 'text-white');
-            activeButton.classList.remove('text-stone-600', 'hover:bg-stone-200');
+            document.querySelector(`[onclick="showTab('${tabName}')"]`).classList.add('active');
 
-            // Ações específicas para cada aba
-            if (tabName === 'painel-diario') {
-                updateDashboard();
-            }
-            if (tabName === 'produtos') {
-                loadProductsForManagement();
-            }
-            if (tabName === 'historico') {
-                loadSalesHistory();
-            }
-            // =============================================================
-            // NOVA LÓGICA: Define o turno automaticamente
-            // =============================================================
+            if (tabName === 'painel-diario') updateDashboard();
+            if (tabName === 'produtos') loadProductsForManagement();
+            if (tabName === 'historico') loadSalesHistory();
             if (tabName === 'registrar-venda') {
                 const turnoSelect = document.getElementById('turno-venda');
                 const currentHour = new Date().getHours();
-                // Se a hora for antes das 14h (0-13), é "Manhã"
-                if (currentHour < 14) {
-                    turnoSelect.value = 'Manhã';
-                } else {
-                    turnoSelect.value = 'Noite';
-                }
+                turnoSelect.value = currentHour < 14 ? 'Manhã' : 'Noite';
             }
         }
         
         function setupEventListeners() {
-            // Pesquisa de produtos na tela de venda
             document.getElementById('search-product-input').addEventListener('input', (e) => {
                 const searchTerm = e.target.value.toLowerCase();
-                const filteredProducts = allProducts.filter(p => p.Status === 'Ativo' && p.Nome_Produto.toLowerCase().includes(searchTerm));
-                populateProductsForSale(filteredProducts);
+                const filtered = allProducts.filter(p => p.Status === 'Ativo' && p.Nome_Produto.toLowerCase().includes(searchTerm));
+                populateProductsForSale(filtered);
             });
             
-            // Finalizar venda
             document.getElementById('finalize-sale-btn').addEventListener('click', handleFinalizeSale);
             
-            // Abrir modal para adicionar produto
             document.getElementById('add-product-btn').addEventListener('click', () => showProductModal());
-
-            // Fechar modal
-            document.getElementById('cancel-product-btn').addEventListener('click', () => hideProductModal());
-
-            // Submeter formulário do produto (criar/editar)
+            document.getElementById('cancel-product-btn').addEventListener('click', hideProductModal);
             document.getElementById('product-form').addEventListener('submit', handleProductFormSubmit);
             
-            // Botões do modal de confirmação
+            // Listeners para o novo modal de venda
+            document.getElementById('cancel-sale-btn').addEventListener('click', hideSaleModal);
+            document.getElementById('sale-form').addEventListener('submit', handleSaleFormSubmit);
+
             document.getElementById('cancel-confirmation-btn').addEventListener('click', hideConfirmationModal);
         }
 
@@ -372,38 +350,30 @@
         // PAINEL DIÁRIO
         // =================================================================
         function updateDashboard() {
-            const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-            
-            const salesToday = allSales.filter(sale => sale.Data_Venda.startsWith(todayStr));
-            const saleItemsToday = allSaleItems.filter(item => {
-                const sale = allSales.find(s => s.Venda_ID === item.Venda_Ref);
-                return sale && sale.Data_Venda.startsWith(todayStr);
-            });
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const salesToday = allSales.filter(s => s.Data_Venda && s.Data_Venda.startsWith(todayStr));
+            const saleItemsToday = allSaleItems.filter(item => salesToday.some(s => s.Venda_ID === item.Venda_Ref));
 
-            // Métrica 1: Vendas Hoje
             const totalSalesToday = salesToday.length;
-            document.getElementById('metric-vendas-hoje').textContent = totalSalesToday;
-
-            // Métrica 2: Receita Hoje
-            const totalRevenueToday = salesToday.reduce((sum, sale) => sum + parseFloat(sale.Valor_Total), 0);
-            document.getElementById('metric-receita-hoje').textContent = `R$ ${totalRevenueToday.toFixed(2).replace('.', ',')}`;
-
-            // Métrica 3: Ticket Médio
+            const totalRevenueToday = salesToday.reduce((sum, sale) => sum + parseFloat(sale.Valor_Total || 0), 0);
             const averageTicket = totalSalesToday > 0 ? (totalRevenueToday / totalSalesToday) : 0;
+
+            document.getElementById('metric-vendas-hoje').textContent = totalSalesToday;
+            document.getElementById('metric-receita-hoje').textContent = `R$ ${totalRevenueToday.toFixed(2).replace('.', ',')}`;
             document.getElementById('metric-ticket-medio').textContent = `R$ ${averageTicket.toFixed(2).replace('.', ',')}`;
 
-            // Métrica 4: Produto mais vendido
             let topProduct = '--';
             if (saleItemsToday.length > 0) {
                 const productCounts = saleItemsToday.reduce((acc, item) => {
-                    acc[item.Produto_Nome] = (acc[item.Produto_Nome] || 0) + item.Quantidade;
+                    acc[item.Produto_Nome] = (acc[item.Produto_Nome] || 0) + parseInt(item.Quantidade, 10);
                     return acc;
                 }, {});
-                topProduct = Object.keys(productCounts).reduce((a, b) => productCounts[a] > productCounts[b] ? a : b, '');
+                if (Object.keys(productCounts).length > 0) {
+                   topProduct = Object.keys(productCounts).reduce((a, b) => productCounts[a] > productCounts[b] ? a : b);
+                }
             }
             document.getElementById('metric-produto-top').textContent = topProduct;
             
-            // Últimas 5 vendas
             const last5Sales = salesToday.slice(-5).reverse();
             const container = document.getElementById('ultimas-vendas-container');
             container.innerHTML = '';
@@ -426,39 +396,33 @@
         }
         
         // =================================================================
-        // REGISTRAR VENDA
+        // REGISTRAR VENDA (CARRINHO)
         // =================================================================
-        function populateProductsForSale(productsToDisplay = null) {
+        function populateProductsForSale(products = null) {
             const container = document.getElementById('product-list-container');
             container.innerHTML = '';
-            
-            const activeProducts = productsToDisplay || allProducts.filter(p => p.Status === 'Ativo');
-
+            const activeProducts = products || allProducts.filter(p => p.Status === 'Ativo');
             if (activeProducts.length === 0) {
                 container.innerHTML = '<p class="text-stone-500 col-span-full text-center">Nenhum produto encontrado.</p>';
                 return;
             }
-            
-            activeProducts.forEach(product => {
-                const productEl = document.createElement('div');
-                productEl.className = 'bg-white border border-stone-200 rounded-lg p-3 text-center cursor-pointer hover:shadow-md hover:border-orange-400 transition-all';
-                productEl.onclick = () => addToCart(product);
-                productEl.innerHTML = `
-                    <img src="${product.URL_Imagem || 'https://placehold.co/300x300/f97316/white?text=' + product.Nome_Produto.charAt(0)}" onerror="this.onerror=null;this.src='https://placehold.co/300x300/e7e5e4/57534e?text=Erro';" class="w-full h-24 object-cover rounded-md mb-2">
-                    <h4 class="font-semibold text-sm truncate">${product.Nome_Produto}</h4>
-                    <p class="text-stone-600">R$ ${parseFloat(product.Preco_Venda).toFixed(2).replace('.', ',')}</p>
+            activeProducts.forEach(p => {
+                const el = document.createElement('div');
+                el.className = 'bg-white border border-stone-200 rounded-lg p-3 text-center cursor-pointer hover:shadow-md hover:border-orange-400 transition-all';
+                el.onclick = () => addToCart(p);
+                el.innerHTML = `
+                    <img src="${p.URL_Imagem || 'https://placehold.co/300x300/f97316/white?text=' + p.Nome_Produto.charAt(0)}" onerror="this.onerror=null;this.src='https://placehold.co/300x300/e7e5e4/57534e?text=Erro';" class="w-full h-24 object-cover rounded-md mb-2">
+                    <h4 class="font-semibold text-sm truncate">${p.Nome_Produto}</h4>
+                    <p class="text-stone-600">R$ ${parseFloat(p.Preco_Venda).toFixed(2).replace('.', ',')}</p>
                 `;
-                container.appendChild(productEl);
+                container.appendChild(el);
             });
         }
 
         function addToCart(product) {
-            const existingItem = cart.find(item => item.Produto_ID === product.Produto_ID);
-            if (existingItem) {
-                existingItem.Quantidade++;
-            } else {
-                cart.push({ ...product, Quantidade: 1 });
-            }
+            const existing = cart.find(item => item.Produto_ID === product.Produto_ID);
+            if (existing) existing.Quantidade++;
+            else cart.push({ ...product, Quantidade: 1 });
             updateCart();
         }
 
@@ -502,22 +466,16 @@
             const item = cart.find(i => i.Produto_ID === productId);
             if (item) {
                 item.Quantidade += amount;
-                if (item.Quantidade <= 0) {
-                    cart = cart.filter(i => i.Produto_ID !== productId);
-                }
+                if (item.Quantidade <= 0) cart = cart.filter(i => i.Produto_ID !== productId);
                 updateCart();
             }
         }
 
         async function handleFinalizeSale() {
             if (cart.length === 0) return;
-            
             showGlobalLoader(true);
-
             const nextSaleId = allSales.length > 0 ? Math.max(...allSales.map(s => parseInt(s.Venda_ID) || 0)) + 1 : 1;
-            
             const total = cart.reduce((sum, item) => sum + item.Preco_Venda * item.Quantidade, 0);
-
             const novaVenda = {
                 Venda_ID: nextSaleId,
                 Data_Venda: new Date().toISOString(),
@@ -525,31 +483,21 @@
                 Metodo_Pagamento: document.getElementById('metodo-pagamento').value,
                 Turno: document.getElementById('turno-venda').value
             };
-
             const itensCarrinho = cart.map(item => ({
-                Item_ID: `${nextSaleId}-${item.Produto_ID}`,
-                Venda_Ref: nextSaleId,
-                Produto_Ref: item.Produto_ID,
-                Produto_Nome: item.Nome_Produto,
-                Quantidade: item.Quantidade,
-                Preco_Unitario: item.Preco_Venda,
+                Item_ID: `${nextSaleId}-${item.Produto_ID}`, Venda_Ref: nextSaleId, Produto_Ref: item.Produto_ID,
+                Produto_Nome: item.Nome_Produto, Quantidade: item.Quantidade, Preco_Unitario: item.Preco_Venda,
                 Subtotal: item.Quantidade * item.Preco_Venda
             }));
             
             try {
-                const response = await postData({ action: 'saveSale', payload: { novaVenda, itensCarrinho } });
-                if (response.status === 'success') {
-                    showToast("Venda registrada com sucesso!", "success");
-                    // Limpar e atualizar
-                    cart = [];
-                    updateCart();
-                    await fetchAllData(); // Re-sincroniza com a planilha
-                    showTab('painel-diario');
-                } else {
-                    throw new Error(response.message || 'Erro desconhecido ao salvar.');
-                }
+                const res = await postData({ action: 'saveSale', payload: { novaVenda, itensCarrinho } });
+                if (res.status !== 'success') throw new Error(res.message);
+                showToast("Venda registrada com sucesso!", "success");
+                cart = [];
+                updateCart();
+                await fetchAllData();
+                showTab('painel-diario');
             } catch (error) {
-                console.error("Erro ao finalizar venda:", error);
                 showToast(`Erro ao salvar: ${error.message}`, "error");
             } finally {
                 showGlobalLoader(false);
@@ -563,55 +511,36 @@
             const container = document.getElementById('product-management-container');
             container.innerHTML = `
                 <table class="min-w-full divide-y divide-stone-200">
-                    <thead class="bg-stone-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">Produto</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">Categoria</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">Preço</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-stone-500 uppercase tracking-wider">Ações</th>
-                        </tr>
-                    </thead>
+                    <thead class="bg-stone-50"><tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase">Produto</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase">Categoria</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase">Preço</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase">Status</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-stone-500 uppercase">Ações</th>
+                    </tr></thead>
                     <tbody class="bg-white divide-y divide-stone-200">
                         ${allProducts.map(p => `
                             <tr>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="flex items-center">
-                                        <div class="flex-shrink-0 h-10 w-10">
-                                            <img class="h-10 w-10 rounded-full object-cover" src="${p.URL_Imagem || 'https://placehold.co/100x100/f97316/white?text=' + p.Nome_Produto.charAt(0)}" alt="">
-                                        </div>
-                                        <div class="ml-4">
-                                            <div class="text-sm font-medium text-stone-900">${p.Nome_Produto}</div>
-                                            <div class="text-sm text-stone-500">ID: ${p.Produto_ID}</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">${p.Categoria}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">R$ ${parseFloat(p.Preco_Venda).toFixed(2).replace('.', ',')}</td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${p.Status === 'Ativo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                                        ${p.Status}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                                <td class="px-6 py-4"><div class="flex items-center">
+                                    <div class="h-10 w-10 flex-shrink-0"><img class="h-10 w-10 rounded-full object-cover" src="${p.URL_Imagem || 'https://placehold.co/100x100/f97316/white?text=' + p.Nome_Produto.charAt(0)}" alt=""></div>
+                                    <div class="ml-4"><div class="text-sm font-medium text-stone-900">${p.Nome_Produto}</div><div class="text-sm text-stone-500">ID: ${p.Produto_ID}</div></div>
+                                </div></td>
+                                <td class="px-6 py-4 text-sm text-stone-500">${p.Categoria}</td>
+                                <td class="px-6 py-4 text-sm text-stone-500">R$ ${parseFloat(p.Preco_Venda).toFixed(2).replace('.', ',')}</td>
+                                <td class="px-6 py-4"><span class="px-2 inline-flex text-xs font-semibold rounded-full ${p.Status === 'Ativo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${p.Status}</span></td>
+                                <td class="px-6 py-4 text-right text-sm font-medium space-x-2">
                                     <button onclick="showProductModal('${p.Produto_ID}')" class="text-orange-600 hover:text-orange-900">Editar</button>
-                                    ${p.Status === 'Ativo' ? 
-                                      `<button onclick="confirmInactivateProduct('${p.Produto_ID}')" class="text-yellow-600 hover:text-yellow-900">Inativar</button>` :
-                                      `<button onclick="confirmDeleteProduct('${p.Produto_ID}')" class="text-red-600 hover:text-red-900">Excluir</button>`
-                                    }
+                                    ${p.Status === 'Ativo' ? `<button onclick="confirmInactivateProduct('${p.Produto_ID}')" class="text-yellow-600 hover:text-yellow-900">Inativar</button>` : `<button onclick="confirmDeleteProduct('${p.Produto_ID}')" class="text-red-600 hover:text-red-900">Excluir</button>`}
                                 </td>
-                            </tr>
-                        `).join('')}
+                            </tr>`).join('')}
                     </tbody>
-                </table>
-            `;
+                </table>`;
         }
         
         function showProductModal(productId = null) {
             const form = document.getElementById('product-form');
             form.reset();
-            populateCategoryFilter(); // Garante que as categorias estão no modal
-            
+            populateCategoryFilter();
             const modalTitle = document.getElementById('modal-title');
             if (productId) {
                 const product = allProducts.find(p => p.Produto_ID == productId);
@@ -628,42 +557,29 @@
             document.getElementById('product-modal').classList.remove('hidden');
         }
 
-        function hideProductModal() {
-            document.getElementById('product-modal').classList.add('hidden');
-        }
+        function hideProductModal() { document.getElementById('product-modal').classList.add('hidden'); }
 
         async function handleProductFormSubmit(e) {
             e.preventDefault();
             showGlobalLoader(true);
-            
             const productId = document.getElementById('produto-id').value;
             const isEditing = !!productId;
-            
             const nextId = allProducts.length > 0 ? Math.max(...allProducts.map(p => parseInt(p.Produto_ID) || 0)) + 1 : 1;
-
             const productData = {
-                Produto_ID: isEditing ? productId : nextId,
-                Nome_Produto: document.getElementById('produto-nome').value,
-                Categoria: document.getElementById('produto-categoria').value,
-                Preco_Venda: parseFloat(document.getElementById('produto-preco').value),
+                Produto_ID: isEditing ? productId : nextId, Nome_Produto: document.getElementById('produto-nome').value,
+                Categoria: document.getElementById('produto-categoria').value, Preco_Venda: parseFloat(document.getElementById('produto-preco').value),
                 URL_Imagem: document.getElementById('produto-imagem').value,
                 Status: isEditing ? allProducts.find(p => p.Produto_ID == productId).Status : 'Ativo'
             };
-
             const action = isEditing ? 'updateProduct' : 'createProduct';
-
             try {
-                const response = await postData({ action, payload: productData });
-                if (response.status === 'success') {
-                    showToast(`Produto ${isEditing ? 'atualizado' : 'criado'} com sucesso!`, "success");
-                    hideProductModal();
-                    await fetchAllData();
-                    loadProductsForManagement();
-                } else {
-                    throw new Error(response.message);
-                }
+                const res = await postData({ action, payload: productData });
+                if (res.status !== 'success') throw new Error(res.message);
+                showToast(`Produto ${isEditing ? 'atualizado' : 'criado'} com sucesso!`, "success");
+                hideProductModal();
+                await fetchAllData();
+                loadProductsForManagement();
             } catch (error) {
-                console.error(`Erro ao salvar produto:`, error);
                 showToast(`Erro: ${error.message}`, "error");
             } finally {
                 showGlobalLoader(false);
@@ -671,77 +587,60 @@
         }
 
         function confirmInactivateProduct(productId) {
-            showConfirmationModal(
-                'Inativar Produto',
-                'Tem certeza que deseja inativar este produto? Ele não aparecerá mais na tela de vendas.',
-                async () => {
-                    showGlobalLoader(true);
-                    try {
-                        const response = await postData({ action: 'inactivateProduct', payload: { Produto_ID: productId } });
-                        if (response.status === 'success') {
-                            showToast('Produto inativado com sucesso.', 'success');
-                            await fetchAllData();
-                            loadProductsForManagement();
-                        } else {
-                            throw new Error(response.message);
-                        }
-                    } catch (error) {
-                        showToast(`Erro: ${error.message}`, 'error');
-                    } finally {
-                        showGlobalLoader(false);
-                    }
-                }
-            );
+            showConfirmationModal('Inativar Produto', 'Tem certeza que deseja inativar este produto?', async () => {
+                showGlobalLoader(true);
+                try {
+                    const res = await postData({ action: 'inactivateProduct', payload: { Produto_ID: productId } });
+                    if (res.status !== 'success') throw new Error(res.message);
+                    showToast('Produto inativado com sucesso.', 'success');
+                    await fetchAllData();
+                    loadProductsForManagement();
+                } catch (error) { showToast(`Erro: ${error.message}`, 'error'); } 
+                finally { showGlobalLoader(false); }
+            });
         }
 
         function confirmDeleteProduct(productId) {
-            showConfirmationModal(
-                'Excluir Produto',
-                'Atenção! Esta ação é permanente e não pode ser desfeita. Deseja realmente excluir este produto?',
-                async () => {
-                    showGlobalLoader(true);
-                    try {
-                        const response = await postData({ action: 'deleteProduct', payload: { Produto_ID: productId } });
-                        if (response.status === 'success') {
-                            showToast('Produto excluído permanentemente.', 'success');
-                            await fetchAllData();
-                            loadProductsForManagement();
-                        } else {
-                            throw new Error(response.message);
-                        }
-                    } catch (error) {
-                        showToast(`Erro: ${error.message}`, 'error');
-                    } finally {
-                        showGlobalLoader(false);
-                    }
-                }
-            );
+            showConfirmationModal('Excluir Produto', 'Atenção! Esta ação é permanente. Deseja realmente excluir?', async () => {
+                showGlobalLoader(true);
+                try {
+                    const res = await postData({ action: 'deleteProduct', payload: { Produto_ID: productId } });
+                    if (res.status !== 'success') throw new Error(res.message);
+                    showToast('Produto excluído permanentemente.', 'success');
+                    await fetchAllData();
+                    loadProductsForManagement();
+                } catch (error) { showToast(`Erro: ${error.message}`, 'error'); } 
+                finally { showGlobalLoader(false); }
+            });
         }
 
         // =================================================================
-        // HISTÓRICO DE VENDAS
+        // HISTÓRICO DE VENDAS (REFEITO)
         // =================================================================
         function loadSalesHistory() {
             const container = document.getElementById('sales-history-container');
             container.innerHTML = '';
+            if (allSales.length === 0) {
+                container.innerHTML = '<p class="text-stone-500">Nenhum histórico de vendas encontrado.</p>';
+                return;
+            }
 
-            const salesByYear = groupBy(allSales, sale => new Date(sale.Data_Venda).getFullYear());
-            
+            const salesByYear = groupBy(allSales, s => new Date(s.Data_Venda).getFullYear());
             const sortedYears = Object.keys(salesByYear).sort((a, b) => b - a);
 
             sortedYears.forEach(year => {
-                const yearAccordion = createAccordionItem(year);
+                const yearAccordion = createAccordionItem(year, 'bg-stone-200');
                 container.appendChild(yearAccordion.item);
                 
-                const salesByMonth = groupBy(salesByYear[year], sale => new Date(sale.Data_Venda).getMonth());
+                const salesByMonth = groupBy(salesByYear[year], s => new Date(s.Data_Venda).getMonth());
                 const sortedMonths = Object.keys(salesByMonth).sort((a, b) => b - a);
 
                 sortedMonths.forEach(monthIndex => {
                     const monthName = new Date(year, monthIndex).toLocaleString('pt-BR', { month: 'long' });
-                    const monthAccordion = createAccordionItem(monthName.charAt(0).toUpperCase() + monthName.slice(1));
+                    const monthAccordion = createAccordionItem(monthName.charAt(0).toUpperCase() + monthName.slice(1), 'bg-stone-100');
                     yearAccordion.content.appendChild(monthAccordion.item);
 
-                    const salesByDay = groupBy(salesByMonth[monthIndex], sale => new Date(sale.Data_Venda).getDate());
+                    const salesByDay = groupBy(salesByMonth[monthIndex], s => new Date(s.Data_Venda).getDate());
                     const sortedDays = Object.keys(salesByDay).sort((a, b) => b - a);
 
                     sortedDays.forEach(day => {
@@ -764,12 +663,14 @@
                                             ${saleItems.map(item => `<li>${item.Quantidade}x ${item.Produto_Nome} (R$ ${parseFloat(item.Subtotal).toFixed(2).replace('.',',')})</li>`).join('')}
                                         </ul>
                                     </div>
-                                    <div class="text-right">
+                                    <div class="text-right space-y-2">
                                         <p class="font-bold text-lg">R$ ${parseFloat(sale.Valor_Total).toFixed(2).replace('.',',')}</p>
-                                        <button onclick="confirmDeleteSale('${sale.Venda_ID}')" class="text-red-500 hover:text-red-700 text-sm mt-2">Excluir Venda</button>
+                                        <div class="flex flex-col sm:flex-row gap-2 items-end">
+                                            <button onclick="showSaleModal('${sale.Venda_ID}')" class="text-sm bg-blue-500 text-white py-1 px-3 rounded-md hover:bg-blue-600">Editar</button>
+                                            <button onclick="confirmDeleteSale('${sale.Venda_ID}')" class="text-sm bg-red-500 text-white py-1 px-3 rounded-md hover:bg-red-600">Excluir</button>
+                                        </div>
                                     </div>
-                                </div>
-                            `;
+                                </div>`;
                             dayAccordion.content.appendChild(saleDetail);
                         });
                     });
@@ -778,27 +679,71 @@
         }
 
         function confirmDeleteSale(saleId) {
-            showConfirmationModal(
-                'Excluir Venda',
-                `Deseja realmente excluir a venda #${saleId} e todos os seus itens? Esta ação é irreversível.`,
-                async () => {
-                    showGlobalLoader(true);
-                    try {
-                        const response = await postData({ action: 'deleteSale', payload: { Venda_ID: saleId } });
-                        if (response.status === 'success') {
-                            showToast('Venda excluída com sucesso.', 'success');
-                            await fetchAllData();
-                            loadSalesHistory();
-                        } else {
-                            throw new Error(response.message);
-                        }
-                    } catch (error) {
-                        showToast(`Erro ao excluir: ${error.message}`, 'error');
-                    } finally {
-                        showGlobalLoader(false);
-                    }
+            showConfirmationModal('Excluir Venda', `Deseja realmente excluir a venda #${saleId} e seus itens?`, async () => {
+                showGlobalLoader(true);
+                try {
+                    const res = await postData({ action: 'deleteSale', payload: { Venda_ID: saleId } });
+                    if (res.status !== 'success') throw new Error(res.message);
+                    showToast('Venda excluída com sucesso.', 'success');
+                    await fetchAllData();
+                    loadSalesHistory();
+                } catch (error) {
+                    showToast(`Erro ao excluir: ${error.message}`, 'error');
+                } finally {
+                    showGlobalLoader(false);
                 }
-            );
+            });
+        }
+        
+        // NOVO: Funções do Modal de Edição de Venda
+        function showSaleModal(saleId) {
+            const sale = allSales.find(s => s.Venda_ID == saleId);
+            if (!sale) {
+                showToast("Venda não encontrada.", "error");
+                return;
+            }
+            
+            document.getElementById('sale-id').value = sale.Venda_ID;
+            document.getElementById('sale-modal-title').textContent = `Editar Venda #${sale.Venda_ID}`;
+            document.getElementById('sale-metodo-pagamento').value = sale.Metodo_Pagamento;
+            document.getElementById('sale-turno').value = sale.Turno;
+
+            const itemsContainer = document.getElementById('sale-items-details');
+            const saleItems = allSaleItems.filter(item => item.Venda_Ref == saleId);
+            itemsContainer.innerHTML = saleItems.map(item => 
+                `<p>${item.Quantidade}x ${item.Produto_Nome}</p>`
+            ).join('');
+
+            document.getElementById('sale-modal').classList.remove('hidden');
+        }
+
+        function hideSaleModal() {
+            document.getElementById('sale-modal').classList.add('hidden');
+        }
+
+        async function handleSaleFormSubmit(e) {
+            e.preventDefault();
+            showGlobalLoader(true);
+            
+            const saleId = document.getElementById('sale-id').value;
+            const updatedData = {
+                Venda_ID: saleId,
+                Metodo_Pagamento: document.getElementById('sale-metodo-pagamento').value,
+                Turno: document.getElementById('sale-turno').value,
+            };
+
+            try {
+                const res = await postData({ action: 'updateSale', payload: updatedData });
+                if (res.status !== 'success') throw new Error(res.message);
+                showToast('Venda atualizada com sucesso!', 'success');
+                hideSaleModal();
+                await fetchAllData();
+                loadSalesHistory();
+            } catch (error) {
+                showToast(`Erro ao atualizar: ${error.message}`, "error");
+            } finally {
+                showGlobalLoader(false);
+            }
         }
 
         // =================================================================
@@ -806,19 +751,13 @@
         // =================================================================
         async function postData(data) {
             try {
-                const response = await fetch(SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'cors',
-                    cache: 'no-cache',
-                    credentials: 'omit',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-t' }, // Workaround for CORS
-                    body: JSON.stringify(data),
-                    redirect: 'follow'
+                const res = await fetch(SCRIPT_URL, {
+                    method: 'POST', mode: 'cors', cache: 'no-cache', credentials: 'omit',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // CORRIGIDO
+                    body: JSON.stringify(data), redirect: 'follow'
                 });
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return await response.json();
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                return await res.json();
             } catch (error) {
                 console.error('Erro no POST:', error);
                 throw error;
@@ -838,24 +777,14 @@
         
         function showToast(message, type = 'info') {
             const toast = document.getElementById('toast');
-            const toastMessage = document.getElementById('toast-message');
-            
+            const toastMessage = document.getElementById('toast-message'); // CORRIGIDO
             toastMessage.textContent = message;
-            toast.className = 'fixed bottom-5 right-5 text-white py-3 px-6 rounded-lg shadow-lg transform transition-all duration-300 ease-out z-50'; // Reset
-            
-            if (type === 'success') {
-                toast.classList.add('bg-green-600');
-            } else if (type === 'error') {
-                toast.classList.add('bg-red-600');
-            } else {
-                toast.classList.add('bg-stone-800');
-            }
-
+            toast.className = 'fixed bottom-5 right-5 text-white py-3 px-6 rounded-lg shadow-lg transform transition-all duration-300 ease-out z-50';
+            if (type === 'success') toast.classList.add('bg-green-600');
+            else if (type === 'error') toast.classList.add('bg-red-600');
+            else toast.classList.add('bg-stone-800');
             toast.classList.remove('translate-y-20', 'opacity-0');
-            
-            setTimeout(() => {
-                toast.classList.add('translate-y-20', 'opacity-0');
-            }, 4000);
+            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 4000);
         }
         
         function showGlobalLoader(isLoading) {
@@ -864,81 +793,62 @@
                 if (!loader) {
                     loader = document.createElement('div');
                     loader.id = 'global-loader';
-                    loader.className = 'fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50';
+                    loader.className = 'fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-[100]';
                     loader.innerHTML = '<div class="loader"></div>';
                     document.body.appendChild(loader);
                 }
                 loader.classList.remove('hidden');
-            } else {
-                if (loader) {
-                    loader.classList.add('hidden');
-                }
+            } else if (loader) {
+                loader.classList.add('hidden');
             }
         }
         
         function showConfirmationModal(title, message, onConfirm) {
             document.getElementById('confirmation-title').textContent = title;
             document.getElementById('confirmation-message').textContent = message;
-            
             const confirmBtn = document.getElementById('confirm-action-btn');
-            // Clone and replace to remove old event listeners
             const newConfirmBtn = confirmBtn.cloneNode(true);
             confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-            
-            newConfirmBtn.onclick = () => {
+            newConfirmBtn.addEventListener('click', () => {
                 hideConfirmationModal();
                 onConfirm();
-            };
-
+            });
             document.getElementById('confirmation-modal').classList.remove('hidden');
         }
 
-        function hideConfirmationModal() {
-            document.getElementById('confirmation-modal').classList.add('hidden');
-        }
+        function hideConfirmationModal() { document.getElementById('confirmation-modal').classList.add('hidden'); }
         
         function groupBy(array, keyGetter) {
-            const map = new Map();
-            array.forEach((item) => {
-                 const key = keyGetter(item);
-                 const collection = map.get(key);
-                 if (!collection) {
-                     map.set(key, [item]);
-                 } else {
-                     collection.push(item);
-                 }
-            });
-            return Object.fromEntries(map);
+            return array.reduce((acc, item) => {
+                const key = keyGetter(item);
+                (acc[key] = acc[key] || []).push(item);
+                return acc;
+            }, {});
         }
         
-        function createAccordionItem(title) {
+        function createAccordionItem(title, headerBg = 'bg-white') {
             const item = document.createElement('div');
-            item.className = 'accordion-item border border-stone-200 rounded-lg';
+            item.className = 'accordion-item border border-stone-200 rounded-lg overflow-hidden';
             
             const header = document.createElement('div');
-            header.className = 'accordion-header flex justify-between items-center p-4 cursor-pointer hover:bg-stone-50';
+            header.className = `accordion-header flex justify-between items-center p-3 cursor-pointer hover:bg-stone-200/50 ${headerBg}`;
             header.innerHTML = `<h4 class="font-semibold">${title}</h4><svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>`;
             
             const content = document.createElement('div');
-            content.className = 'accordion-content bg-stone-50/50';
+            content.className = 'accordion-content bg-stone-50/50 pl-4';
             
             item.appendChild(header);
             item.appendChild(content);
             
-            header.addEventListener('click', () => {
+            header.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = item.classList.contains('open');
                 item.classList.toggle('open');
-                const icon = header.querySelector('svg');
-                icon.classList.toggle('rotate-180');
-                if (content.style.maxHeight) {
-                    content.style.maxHeight = null;
-                } else {
-                    content.style.maxHeight = content.scrollHeight + "px";
-                }
+                header.querySelector('svg').classList.toggle('rotate-180', !isOpen);
             });
             
             return { item, content };
         }
-
     </script>
 </body>
 </html>
