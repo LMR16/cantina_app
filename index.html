@@ -246,11 +246,22 @@
                     DB.itens_venda = itensVenda;
                     
                     renderCurrentView();
+                }
 
-                } catch (error) {
-                    // Agora o erro exibido será muito mais específico!
-                    console.error("Erro detalhado ao buscar dados:", error);
-                    alert("Ocorreu um erro ao carregar os dados. Verifique o console do navegador (F12) para mais detalhes.");
+
+                // ...E SUBSTITUA PELO BLOCO ABAIXO:
+                catch (error) {
+                    // Constrói uma mensagem de erro bem detalhada
+                    const errorMessage = `Ocorreu um erro ao carregar os dados.\n\nDetalhes:\n${error.message}`;
+                    
+                    // Exibe a mensagem detalhada diretamente no alerta
+                    alert(errorMessage);
+                    
+                    // Registra as propriedades do erro separadamente no console para garantir
+                    console.error("=== INÍCIO DO ERRO DETALHADO ===");
+                    console.error("Mensagem completa do erro:", error.message);
+                    console.error("Stack Trace (onde ocorreu):", error.stack);
+                    console.error("=== FIM DO ERRO DETALHADO ===");
                 } finally {
                     showLoading(false);
                 }
