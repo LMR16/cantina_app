@@ -3,7 +3,7 @@ const { google } = require('googleapis');
 
 // O ID da sua planilha. Pode encontrá-lo na URL da sua planilha Google.
 // Ex: https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit
-const SPREADSHEET_ID = 'COLE_O_ID_DA_SUA_PLANILHA_AQUI';
+const SPREADSHEET_ID = '1fjxn9_C9n3TRaV9NmNdtbVlMOX__kZO_FDxLKQLN45g';
 
 // As credenciais da sua conta de serviço.
 // Estas serão guardadas de forma segura nas variáveis de ambiente do Netlify.
