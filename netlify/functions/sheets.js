@@ -1,74 +1,187 @@
-// Importa a biblioteca oficial do Google
 const { google } = require('googleapis');
 
-// O ID da sua planilha. Pode encontrá-lo na URL da sua planilha Google.
-// Ex: https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit
-const SPREADSHEET_ID = '1fjxn9_C9n3TRaV9NmNdtbVlMOX__kZO_FDxLKQLN45g';
-
-// As credenciais da sua conta de serviço.
-// Estas serão guardadas de forma segura nas variáveis de ambiente do Netlify.
+// As credenciais e o ID da planilha são lidos das variáveis de ambiente do Netlify
+const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 const credentials = {
   client_email: process.env.GOOGLE_CLIENT_EMAIL,
-  private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'), // Corrige a formatação da chave privada
+  private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
 };
 
-// Função principal que o Netlify irá executar
-exports.handler = async (event) => {
-  try {
-    // Configura o cliente de autenticação
-    const auth = new google.auth.GoogleAuth({
-      credentials,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
+// Helper para inicializar a autenticação
+function getAuth() {
+  return new google.auth.GoogleAuth({
+    credentials,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  });
+}
 
-    const sheets = google.sheets({ version: 'v4', auth });
+// =============================================
+// FUNÇÕES DE MANIPULAÇÃO DA PLANILHA
+// =============================================
 
-    // Pega o nome da aba a partir dos parâmetros da URL (ex: ?sheet=produtos)
-    const sheetName = event.queryStringParameters.sheet;
-    if (!sheetName) {
-      throw new Error("Parâmetro 'sheet' é obrigatório.");
-    }
+async function getSheetData(sheets, range) {
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: range,
+  });
+  return response.data.values || [];
+}
 
-    // Lê os dados da planilha
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: sheetName, // Lê a aba inteira
-    });
+async function appendRow(sheets, range, values) {
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SPREADSHEET_ID,
+    range: range,
+    valueInputOption: 'USER_ENTERED',
+    resource: { values: [values] },
+  });
+}
 
-    const rows = response.data.values;
-    if (!rows || rows.length === 0) {
-      return {
-        statusCode: 200,
-        body: JSON.stringify([]),
-      };
-    }
+async function updateRow(sheets, range, values) {
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: range,
+    valueInputOption: 'USER_ENTERED',
+    resource: { values: [values] },
+  });
+}
 
-    // Converte as linhas para objetos JSON, tal como o seu código original fazia
+async function findRowById(sheets, sheetName, id, idColumnIndex = 0) {
+    const rows = await getSheetData(sheets, sheetName);
     const headers = rows.shift();
-    const json = rows.map(row => {
-      let obj = {};
-      headers.forEach((header, i) => {
-        if (header) {
-          obj[header] = row[i];
+    for (let i = 0; i < rows.length; i++) {
+        if (rows[i][idColumnIndex] === id) {
+            return { rowIndex: i + 2, headers, rowData: rows[i] };
         }
-      });
-      return obj;
-    });
+    }
+    return { rowIndex: -1, headers: null, rowData: null };
+}
 
-    // Retorna os dados com sucesso
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(json),
-    };
-  } catch (error) {
-    console.error('Erro ao aceder à planilha:', error);
-    // Retorna uma mensagem de erro clara
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Falha ao aceder aos dados da planilha.', message: error.message }),
-    };
+async function deleteRow(sheets, sheetId, rowIndex) {
+    await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SPREADSHEET_ID,
+        resource: {
+            requests: [{
+                deleteDimension: {
+                    range: {
+                        sheetId: sheetId,
+                        dimension: 'ROWS',
+                        startIndex: rowIndex - 1,
+                        endIndex: rowIndex,
+                    },
+                },
+            }],
+        },
+    });
+}
+
+// =============================================
+// FUNÇÃO PRINCIPAL (HANDLER)
+// =============================================
+
+exports.handler = async (event) => {
+  const auth = getAuth();
+  const sheets = google.sheets({ version: 'v4', auth });
+
+  // Lógica para requisições GET (Leitura)
+  if (event.httpMethod === 'GET') {
+    try {
+      const sheetName = event.queryStringParameters.sheet;
+      if (!sheetName) throw new Error("Parâmetro 'sheet' é obrigatório.");
+
+      const rows = await getSheetData(sheets, sheetName);
+      if (rows.length === 0) {
+        return { statusCode: 200, body: JSON.stringify([]) };
+      }
+
+      const headers = rows.shift();
+      const json = rows.map(row => headers.reduce((obj, header, i) => {
+        obj[header] = row[i];
+        return obj;
+      }, {}));
+
+      return { statusCode: 200, body: JSON.stringify(json) };
+    } catch (error) {
+      console.error('Erro em GET:', error);
+      return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+    }
   }
+
+  // Lógica para requisições POST (Escrita)
+  if (event.httpMethod === 'POST') {
+    try {
+      const body = JSON.parse(event.body);
+      const { action, payload } = body;
+
+      switch (action) {
+        case 'saveSale': {
+          const { novaVenda, itensCarrinho } = payload;
+          const vendasHeaders = (await getSheetData(sheets, 'vendas!1:1'))[0];
+          const itensHeaders = (await getSheetData(sheets, 'itens_venda!1:1'))[0];
+          
+          const vendaRow = vendasHeaders.map(h => novaVenda[h] || '');
+          await appendRow(sheets, 'vendas', vendaRow);
+
+          for (const item of itensCarrinho) {
+              const itemRow = itensHeaders.map(h => item[h] || '');
+              await appendRow(sheets, 'itens_venda', itemRow);
+          }
+          return { statusCode: 200, body: JSON.stringify({ message: 'Venda salva com sucesso.' }) };
+        }
+
+        case 'createProduct': {
+          const productHeaders = (await getSheetData(sheets, 'produtos!1:1'))[0];
+          const productRow = productHeaders.map(h => payload[h] || '');
+          await appendRow(sheets, 'produtos', productRow);
+          return { statusCode: 200, body: JSON.stringify({ message: 'Produto criado com sucesso.' }) };
+        }
+
+        case 'updateProduct': {
+          const { rowIndex, headers } = await findRowById(sheets, 'produtos', payload.Produto_ID);
+          if (rowIndex === -1) throw new Error('Produto não encontrado.');
+          const productRow = headers.map(h => payload[h] || '');
+          await updateRow(sheets, `produtos!A${rowIndex}`, productRow);
+          return { statusCode: 200, body: JSON.stringify({ message: 'Produto atualizado com sucesso.' }) };
+        }
+        
+        // NOVA LÓGICA DE APAGAR PRODUTO
+        case 'handleDeleteProduct': {
+            const { productId, productSheetGid } = payload;
+            
+            // 1. Verificar se o produto existe em 'itens_venda'
+            const itensVendaData = await getSheetData(sheets, 'itens_venda');
+            const itensHeaders = itensVendaData.shift();
+            const produtoRefIndex = itensHeaders.indexOf('Produto_Ref');
+            const isProductSold = itensVendaData.some(row => row[produtoRefIndex] === productId);
+
+            // 2. Encontrar o produto na aba 'produtos'
+            const { rowIndex, headers, rowData } = await findRowById(sheets, 'produtos', productId);
+            if (rowIndex === -1) throw new Error('Produto não encontrado para apagar.');
+
+            if (isProductSold) {
+                // 3a. Se já foi vendido, INATIVAR
+                const statusIndex = headers.indexOf('Status');
+                if (statusIndex === -1) throw new Error("Coluna 'Status' não encontrada na aba de produtos.");
+                
+                let updatedProductData = [...rowData];
+                updatedProductData[statusIndex] = 'Inativo';
+                
+                await updateRow(sheets, `produtos!A${rowIndex}`, updatedProductData);
+                return { statusCode: 200, body: JSON.stringify({ message: 'Produto inativado pois possui histórico de vendas.' }) };
+            } else {
+                // 3b. Se nunca foi vendido, APAGAR
+                await deleteRow(sheets, productSheetGid, rowIndex);
+                return { statusCode: 200, body: JSON.stringify({ message: 'Produto excluído permanentemente.' }) };
+            }
+        }
+
+        default:
+          throw new Error('Ação desconhecida.');
+      }
+    } catch (error) {
+      console.error('Erro em POST:', error);
+      return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+    }
+  }
+
+  return { statusCode: 405, body: JSON.stringify({ error: 'Método não permitido.' }) };
 };

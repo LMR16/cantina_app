@@ -14,7 +14,7 @@
         .nav-button { transition: all 0.2s ease-in-out; text-align: left; }
         .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
         .accordion-header-icon { transition: transform 0.3s ease-out; }
-        .open .accordion-header-icon { transform: rotate(90deg); }
+        .open > .accordion-header .accordion-header-icon { transform: rotate(90deg); }
         .modal-overlay { transition: opacity 0.2s ease-in-out; }
     </style>
 </head>
@@ -124,7 +124,6 @@
                     <div id="historico-lista-container" class="bg-white p-6 rounded-xl shadow-md space-y-2">
                     </div>
                 </section>
-
             </main>
         </div>
     </div>
@@ -170,6 +169,12 @@
             
             const API_ENDPOINT = '/.netlify/functions/sheets';
 
+            const SHEET_GIDS = {
+                produtos: 0, // Substitua pelo GID real da aba 'produtos'
+                vendas: 169505950, // Substitua pelo GID real da aba 'vendas'
+                itens_venda: 1248145908 // Substitua pelo GID real da aba 'itens_venda'
+            };
+
             let DB = {
                 produtos: [],
                 categorias: [],
@@ -182,23 +187,19 @@
                 showLoading(true);
                 try {
                     const sheetsToFetch = ['produtos', 'categorias', 'imagens', 'vendas', 'itens_venda'];
-                    
                     const processResponse = async (response, sheetName) => {
                         if (!response.ok) {
                             const errorData = await response.json().catch(() => ({ message: 'Resposta inválida do servidor.' }));
-                            throw new Error(`Falha ao buscar a aba '${sheetName}'. Status: ${response.status}. Mensagem: ${errorData.message || 'Erro desconhecido'}`);
+                            throw new Error(`Falha ao buscar a aba '${sheetName}'. Status: ${response.status}. Mensagem: ${errorData.error || 'Erro desconhecido'}`);
                         }
                         return response.json();
                     };
 
-                    DB.produtos = await fetch(`${API_ENDPOINT}?sheet=produtos`).then(res => processResponse(res, 'produtos'));
-                    DB.categorias = await fetch(`${API_ENDPOINT}?sheet=categorias`).then(res => processResponse(res, 'categorias'));
-                    DB.imagens = await fetch(`${API_ENDPOINT}?sheet=imagens`).then(res => processResponse(res, 'imagens'));
-                    DB.vendas = await fetch(`${API_ENDPOINT}?sheet=vendas`).then(res => processResponse(res, 'vendas'));
-                    DB.itens_venda = await fetch(`${API_ENDPOINT}?sheet=itens_venda`).then(res => processResponse(res, 'itens_venda'));
+                    for (const sheet of sheetsToFetch) {
+                        DB[sheet] = await fetch(`${API_ENDPOINT}?sheet=${sheet}`).then(res => processResponse(res, sheet));
+                    }
                     
                     renderCurrentView();
-
                 } catch (error) {
                     alert(`Ocorreu um erro crítico ao carregar os dados:\n\n${error.message}`);
                     console.error("=== ERRO DETALHADO EM fetchData ===", error);
@@ -231,45 +232,31 @@
                 return `R$ ${numValue.toFixed(2).replace('.', ',')}`;
             }
 
-            const getTodayString = () => {
-                const today = new Date();
-                const year = today.getFullYear();
-                const month = String(today.getMonth() + 1).padStart(2, '0');
-                const day = String(today.getDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-            };
+            const getTodayString = () => new Date().toISOString().split('T')[0];
             
             const navButtons = document.querySelectorAll('.nav-button');
             const views = document.querySelectorAll('.view');
 
             navButtons.forEach(button => {
                 button.addEventListener('click', () => {
-                    const viewName = button.dataset.view;
-                    appState.currentView = viewName;
-                    
+                    appState.currentView = button.dataset.view;
                     navButtons.forEach(btn => btn.classList.remove('active'));
                     button.classList.add('active');
-
-                    views.forEach(view => {
-                        if (view.id === viewName) {
-                            view.classList.remove('hidden');
-                        } else {
-                            view.classList.add('hidden');
-                        }
-                    });
+                    views.forEach(view => view.classList.toggle('hidden', view.id !== appState.currentView));
                     renderCurrentView();
                 });
             });
 
             function renderCurrentView() {
-                switch (appState.currentView) {
-                    case 'painel': renderPainelDiario(); break;
-                    case 'registrar': renderRegistrarVenda(); break;
-                    case 'produtos': renderProdutos(); break;
-                    case 'historico': renderHistorico(); break;
-                }
+                const renderMap = {
+                    painel: renderPainelDiario,
+                    registrar: renderRegistrarVenda,
+                    produtos: renderProdutos,
+                    historico: renderHistorico,
+                };
+                renderMap[appState.currentView]();
             }
-
+            
             function renderPainelDiario() {
                 const hoje = getTodayString();
                 const vendasHoje = DB.vendas.filter(v => v.Data && v.Data.startsWith(hoje));
@@ -387,9 +374,51 @@
             }
 
             document.getElementById('salvar-venda').addEventListener('click', async () => {
-                // A funcionalidade de salvar venda precisaria de uma nova função Netlify
-                // para escrever na planilha. Por agora, esta funcionalidade está desativada.
-                alert("A funcionalidade de salvar vendas ainda não foi implementada com a nova arquitetura.");
+                const saveButton = document.getElementById('salvar-venda');
+                saveButton.disabled = true;
+                saveButton.textContent = 'Salvando...';
+
+                const dataAtual = new Date();
+                const novaVenda = {
+                    Venda_ID: `V${Date.now()}`,
+                    NomeComprador: document.getElementById('nome-comprador').value || 'Cliente',
+                    Data: dataAtual.toISOString().split('T')[0],
+                    TimestampVenda: dataAtual.toISOString(),
+                    Turno: dataAtual.getHours() >= 14 ? 'Noite' : 'Manhã',
+                    FormaPagamento: appState.pagamento,
+                    TotalVenda: appState.carrinho.reduce((sum, item) => sum + (parseFloat(item.Preco || 0) * item.Quantidade), 0),
+                    Ano: dataAtual.getFullYear().toString(),
+                };
+
+                const itensCarrinho = appState.carrinho.map(item => ({
+                    ItemVenda_ID: `IV${Date.now()}${item.Produto_ID}`,
+                    Venda_Ref: novaVenda.Venda_ID,
+                    Produto_Ref: item.Produto_ID,
+                    Quantidade: item.Quantidade,
+                    PrecoUnitario: parseFloat(item.Preco || 0),
+                    Subtotal: parseFloat(item.Preco || 0) * item.Quantidade,
+                }));
+
+                try {
+                    const response = await fetch(API_ENDPOINT, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'saveSale', payload: { novaVenda, itensCarrinho } }),
+                    });
+                    if (!response.ok) throw new Error((await response.json()).error);
+                    
+                    alert('Venda salva com sucesso!');
+                    appState.carrinho = [];
+                    appState.pagamento = null;
+                    document.getElementById('nome-comprador').value = '';
+                    document.querySelectorAll('.pagamento-btn').forEach(b => b.classList.remove('bg-orange-500', 'text-white'));
+                    await fetchData();
+                    renderCarrinho();
+                } catch (error) {
+                    alert(`Erro ao salvar venda: ${error.message}`);
+                } finally {
+                    saveButton.disabled = false;
+                    saveButton.textContent = 'Salvar Venda';
+                }
             });
 
             function renderProdutos() {
@@ -397,23 +426,19 @@
                 const listaProdutosEl = document.getElementById('lista-produtos-catalogo');
                 listaProdutosEl.innerHTML = '';
                 DB.produtos.filter(p => p.Status === status).forEach(produto => {
-                    const imagem = DB.imagens.find(i => i.Imagem_ID === produto.Imagem_Ref);
-                    const categoria = DB.categorias.find(c => c.Categoria_ID === produto.Categoria_Ref);
                     const produtoCard = document.createElement('div');
                     produtoCard.className = 'bg-white rounded-xl shadow-md overflow-hidden flex flex-col';
                     produtoCard.innerHTML = `
-                        <img src="${imagem ? imagem.Arquivo : 'https://placehold.co/400x300/cccccc/FFFFFF?text=Sem+Imagem'}" alt="${produto.Nome}" class="w-full h-40 object-cover" onerror="this.onerror=null;this.src='https://placehold.co/400x300/cccccc/FFFFFF?text=Erro';">
                         <div class="p-4 flex flex-col flex-grow">
-                            <p class="text-xs text-orange-600 font-semibold">${categoria ? categoria.NomeCategoria.toUpperCase() : 'SEM CATEGORIA'}</p>
                             <h3 class="text-lg font-bold">${produto.Nome}</h3>
-                            <p class="text-stone-600 mb-2 h-10 overflow-hidden flex-grow">${produto.Descricao}</p>
+                            <p class="text-stone-600 mb-2 h-10 overflow-hidden flex-grow">${produto.Descricao || ''}</p>
                             <p class="text-xl font-bold text-right mt-2">${formatCurrency(produto.Preco)}</p>
                         </div>
                         <div class="bg-stone-50 p-2 flex justify-end gap-2">
                             <button data-id="${produto.Produto_ID}" class="edit-product-btn p-2 rounded-full hover:bg-stone-200" title="Editar Produto">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-stone-600" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
                             </button>
-                            <button data-id="${produto.Produto_ID}" class="delete-product-btn p-2 rounded-full hover:bg-stone-200" title="Excluir/Inativar Produto">
+                            <button data-id="${produto.Produto_ID}" class="delete-product-btn p-2 rounded-full hover:bg-stone-200" title="Excluir Produto">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
                             </button>
                         </div>
@@ -424,16 +449,16 @@
                 document.querySelectorAll('.edit-product-btn').forEach(btn => btn.addEventListener('click', (e) => openProductModal(e.currentTarget.dataset.id)));
                 document.querySelectorAll('.delete-product-btn').forEach(btn => btn.addEventListener('click', (e) => handleDeleteProduct(e.currentTarget.dataset.id)));
             }
-
+            
             document.querySelectorAll('.status-tab-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     appState.activeProductStatusTab = btn.dataset.status;
                     document.querySelectorAll('.status-tab-btn').forEach(b => {
-                        b.classList.remove('active', 'border-orange-500');
-                        b.classList.add('text-stone-500', 'border-transparent');
+                        b.classList.toggle('active', b === btn);
+                        b.classList.toggle('border-orange-500', b === btn);
+                        b.classList.toggle('text-stone-500', b !== btn);
+                        b.classList.toggle('border-transparent', b !== btn);
                     });
-                    btn.classList.add('active', 'border-orange-500');
-                    btn.classList.remove('text-stone-500', 'border-transparent');
                     renderProdutos();
                 });
             });
@@ -441,8 +466,21 @@
             document.getElementById('add-new-product-btn').addEventListener('click', () => openProductModal());
 
             function openProductModal(productId = null) {
-                // Funcionalidade de edição/criação está desativada por agora
-                alert("A funcionalidade de editar/criar produtos ainda não foi implementada com a nova arquitetura.");
+                const form = document.getElementById('product-form');
+                form.reset();
+                if (productId) {
+                    const product = DB.produtos.find(p => p.Produto_ID === productId);
+                    document.getElementById('product-modal-title').textContent = 'Editar Produto';
+                    document.getElementById('product-id').value = product.Produto_ID;
+                    document.getElementById('product-name').value = product.Nome;
+                    document.getElementById('product-price').value = product.Preco;
+                    document.getElementById('product-description').value = product.Descricao;
+                    document.getElementById('product-status').value = product.Status;
+                } else {
+                    document.getElementById('product-modal-title').textContent = 'Adicionar Novo Produto';
+                    document.getElementById('product-id').value = '';
+                }
+                document.getElementById('product-modal').classList.remove('hidden');
             }
             
             function closeProductModal() {
@@ -451,12 +489,60 @@
 
             document.getElementById('cancel-product-modal').addEventListener('click', closeProductModal);
             
+            document.getElementById('product-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const productId = document.getElementById('product-id').value;
+                const isUpdating = !!productId;
+
+                const productData = {
+                    Produto_ID: isUpdating ? productId : `P${Date.now()}`,
+                    Nome: document.getElementById('product-name').value,
+                    Preco: document.getElementById('product-price').value,
+                    Descricao: document.getElementById('product-description').value,
+                    Status: document.getElementById('product-status').value,
+                    Categoria_Ref: '', 
+                    Imagem_Ref: '',
+                };
+
+                const action = isUpdating ? 'updateProduct' : 'createProduct';
+                
+                try {
+                    const response = await fetch(API_ENDPOINT, {
+                        method: 'POST',
+                        body: JSON.stringify({ action, payload: productData }),
+                    });
+                    if (!response.ok) throw new Error((await response.json()).error);
+                    
+                    alert(`Produto ${isUpdating ? 'atualizado' : 'adicionado'} com sucesso!`);
+                    closeProductModal();
+                    await fetchData();
+                } catch (error) {
+                    alert(`Erro ao salvar produto: ${error.message}`);
+                }
+            });
+
             async function handleDeleteProduct(productId) {
-                 alert("A funcionalidade de apagar produtos ainda não foi implementada com a nova arquitetura.");
-            }
-            
-            async function deleteSale(saleId) {
-                alert("A funcionalidade de apagar vendas ainda não foi implementada com a nova arquitetura.");
+                if (confirm('Tem certeza que deseja processar este produto? Se ele tiver vendas, será inativado. Caso contrário, será excluído.')) {
+                    try {
+                        const response = await fetch(API_ENDPOINT, {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                action: 'handleDeleteProduct',
+                                payload: {
+                                    productId: productId,
+                                    productSheetGid: SHEET_GIDS.produtos
+                                }
+                            }),
+                        });
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.error);
+                        
+                        alert(result.message); // Exibe a mensagem do servidor (inativado ou excluído)
+                        await fetchData();
+                    } catch (error) {
+                        alert(`Erro ao processar produto: ${error.message}`);
+                    }
+                }
             }
             
             function renderHistorico() {
@@ -468,128 +554,91 @@
                 }
 
                 const mesesNomes = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+                const diasNomes = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
                 const dadosAgrupados = DB.vendas.reduce((acc, venda) => {
                     if (!venda.Data) return acc;
-                    const data = new Date(venda.Data);
+                    const data = new Date(venda.Data + 'T12:00:00Z'); // Use UTC para evitar problemas de fuso horário
                     if (isNaN(data.getTime())) return acc;
 
-                    const ano = data.getFullYear();
-                    const mes = data.getMonth();
-                    const semanaDoMes = Math.ceil(data.getDate() / 7);
-
+                    const ano = data.getUTCFullYear();
+                    const mes = data.getUTCMonth();
+                    const semanaDoMes = Math.ceil(data.getUTCDate() / 7);
+                    const diaDoMes = data.getUTCDate();
+                    const diaDaSemana = diasNomes[data.getUTCDay()];
+                    const turno = venda.Turno || 'Indefinido';
+                    
                     if (!acc[ano]) acc[ano] = { total: 0, meses: {} };
                     if (!acc[ano].meses[mes]) acc[ano].meses[mes] = { total: 0, semanas: {} };
-                    if (!acc[ano].meses[mes].semanas[semanaDoMes]) acc[ano].meses[mes].semanas[semanaDoMes] = { total: 0, vendas: [] };
-                    
+                    if (!acc[ano].meses[mes].semanas[semanaDoMes]) acc[ano].meses[mes].semanas[semanaDoMes] = { total: 0, dias: {} };
+                    if (!acc[ano].meses[mes].semanas[semanaDoMes].dias[diaDoMes]) acc[ano].meses[mes].semanas[semanaDoMes].dias[diaDoMes] = { total: 0, nome: `${diaDoMes} - ${diaDaSemana}`, turnos: {} };
+                    if (!acc[ano].meses[mes].semanas[semanaDoMes].dias[diaDoMes].turnos[turno]) acc[ano].meses[mes].semanas[semanaDoMes].dias[diaDoMes].turnos[turno] = { total: 0, vendas: [] };
+
                     const totalVenda = parseFloat(venda.TotalVenda || 0);
                     acc[ano].total += totalVenda;
                     acc[ano].meses[mes].total += totalVenda;
                     acc[ano].meses[mes].semanas[semanaDoMes].total += totalVenda;
-                    acc[ano].meses[mes].semanas[semanaDoMes].vendas.push(venda);
+                    acc[ano].meses[mes].semanas[semanaDoMes].dias[diaDoMes].total += totalVenda;
+                    acc[ano].meses[mes].semanas[semanaDoMes].dias[diaDoMes].turnos[turno].total += totalVenda;
+                    acc[ano].meses[mes].semanas[semanaDoMes].dias[diaDoMes].turnos[turno].vendas.push(venda);
                     
                     return acc;
                 }, {});
 
-                const anosOrdenados = Object.keys(dadosAgrupados).sort((a, b) => b - a);
-
-                if (anosOrdenados.length === 0) {
-                    container.innerHTML = '<p class="text-stone-500">Nenhum histórico de vendas encontrado.</p>';
-                    return;
-                }
-
-                anosOrdenados.forEach(ano => {
-                    const anoData = dadosAgrupados[ano];
-                    const anoEl = document.createElement('div');
-                    anoEl.className = 'border-b border-stone-200 pb-2';
-                    anoEl.innerHTML = `
-                        <div class="accordion-header flex justify-between items-center cursor-pointer p-2 hover:bg-stone-100 rounded-md">
-                            <div class="flex items-center gap-3">
-                                <span class="accordion-header-icon font-bold text-lg text-orange-600">▶</span>
-                                <span class="font-bold text-xl">${ano}</span>
-                            </div>
-                            <span class="font-bold text-xl text-stone-700">${formatCurrency(anoData.total)}</span>
-                        </div>
-                        <div class="accordion-content pl-6"></div>
-                    `;
-                    container.appendChild(anoEl);
-
-                    const mesesContainer = anoEl.querySelector('.accordion-content');
-                    const mesesOrdenados = Object.keys(anoData.meses).sort((a, b) => a - b);
-                    
-                    mesesOrdenados.forEach(mesIdx => {
-                        const mesData = anoData.meses[mesIdx];
-                        const mesEl = document.createElement('div');
-                        mesEl.className = 'mt-2';
-                        mesEl.innerHTML = `
-                            <div class="accordion-header flex justify-between items-center cursor-pointer p-2 hover:bg-stone-100 rounded-md">
+                const createAccordionLevel = (title, total, content, level) => {
+                    const paddingLeft = level * 1.5;
+                    return `
+                        <div class="accordion-item">
+                            <div class="accordion-header flex justify-between items-center cursor-pointer p-2 hover:bg-stone-100 rounded-md" style="padding-left: ${paddingLeft}rem;">
                                 <div class="flex items-center gap-3">
-                                    <span class="accordion-header-icon font-semibold text-stone-600">▶</span>
-                                    <span class="font-semibold text-lg">${mesesNomes[mesIdx]}</span>
+                                    <span class="accordion-header-icon font-bold text-lg text-orange-600">▶</span>
+                                    <span class="font-semibold">${title}</span>
                                 </div>
-                                <span class="font-semibold text-lg text-stone-600">${formatCurrency(mesData.total)}</span>
+                                <span class="font-semibold">${formatCurrency(total)}</span>
                             </div>
-                            <div class="accordion-content pl-6"></div>
-                        `;
-                        mesesContainer.appendChild(mesEl);
-
-                        const semanasContainer = mesEl.querySelector('.accordion-content');
-                        const semanasOrdenadas = Object.keys(mesData.semanas).sort((a, b) => a - b);
-
-                        semanasOrdenadas.forEach(semanaNum => {
-                            const semanaData = mesData.semanas[semanaNum];
-                            const semanaEl = document.createElement('div');
-                            semanaEl.className = 'mt-2';
-                            semanaEl.innerHTML = `
-                                <div class="accordion-header flex justify-between items-center cursor-pointer p-2 hover:bg-stone-100 rounded-md">
-                                    <div class="flex items-center gap-3">
-                                        <span class="accordion-header-icon text-stone-500">▶</span>
-                                        <span class="text-md">Semana ${semanaNum}</span>
-                                    </div>
-                                    <span class="text-md font-semibold text-stone-500">${formatCurrency(semanaData.total)}</span>
-                                </div>
-                                <div class="accordion-content pl-8 pt-2 space-y-2"></div>
-                            `;
-                            semanasContainer.appendChild(semanaEl);
-
-                            const vendasContainer = semanaEl.querySelector('.accordion-content');
-                            semanaData.vendas.sort((a,b) => new Date(b.Data) - new Date(a.Data)).forEach(venda => {
-                                const vendaEl = document.createElement('div');
-                                vendaEl.className = 'flex justify-between items-center p-2 bg-stone-50 rounded-lg';
-                                vendaEl.innerHTML = `
-                                    <div class="flex-grow">
-                                        <p class="font-semibold">${venda.NomeComprador || 'Cliente'} - ${new Date(venda.Data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</p>
-                                        <p class="text-sm text-stone-500">${venda.FormaPagamento}</p>
-                                    </div>
-                                    <div class="flex items-center gap-2">
-                                        <p class="font-bold mr-4">${formatCurrency(venda.TotalVenda)}</p>
-                                        <button data-id="${venda.Venda_ID}" class="delete-sale-btn p-2 rounded-full hover:bg-stone-200" title="Excluir Venda">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
-                                        </button>
-                                    </div>
-                                `;
-                                vendasContainer.appendChild(vendaEl);
-                            });
-                        });
-                    });
-                });
-
-                document.querySelectorAll('.accordion-header').forEach(header => {
-                    header.addEventListener('click', () => {
-                        const content = header.nextElementSibling;
-                        header.parentElement.classList.toggle('open');
-                        if (content.style.maxHeight) {
-                            content.style.maxHeight = null;
-                        } else {
-                            content.style.maxHeight = content.scrollHeight + "px";
-                        }
-                    });
-                });
+                            <div class="accordion-content">${content}</div>
+                        </div>`;
+                };
                 
-                document.querySelectorAll('.delete-sale-btn').forEach(btn => btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    deleteSale(e.currentTarget.dataset.id);
-                }));
+                let html = '';
+                Object.keys(dadosAgrupados).sort((a, b) => b - a).forEach(ano => {
+                    let mesesHtml = '';
+                    Object.keys(dadosAgrupados[ano].meses).sort((a, b) => b - a).forEach(mesIdx => {
+                        let semanasHtml = '';
+                        Object.keys(dadosAgrupados[ano].meses[mesIdx].semanas).sort((a, b) => b - a).forEach(semanaNum => {
+                            let diasHtml = '';
+                            Object.keys(dadosAgrupados[ano].meses[mesIdx].semanas[semanaNum].dias).sort((a, b) => b - a).forEach(diaNum => {
+                                let turnosHtml = '';
+                                Object.keys(dadosAgrupados[ano].meses[mesIdx].semanas[semanaNum].dias[diaNum].turnos).sort().forEach(turno => {
+                                    let vendasHtml = '';
+                                    dadosAgrupados[ano].meses[mesIdx].semanas[semanaNum].dias[diaNum].turnos[turno].vendas.forEach(venda => {
+                                        vendasHtml += `
+                                            <div class="flex justify-between items-center p-2 bg-stone-50 rounded-lg ml-6">
+                                                <p>${venda.NomeComprador || 'Cliente'} - ${venda.FormaPagamento}</p>
+                                                <p class="font-bold">${formatCurrency(venda.TotalVenda)}</p>
+                                            </div>`;
+                                    });
+                                    turnosHtml += createAccordionLevel(`Turno ${turno}`, dadosAgrupados[ano].meses[mesIdx].semanas[semanaNum].dias[diaNum].turnos[turno].total, vendasHtml, 4);
+                                });
+                                diasHtml += createAccordionLevel(dadosAgrupados[ano].meses[mesIdx].semanas[semanaNum].dias[diaNum].nome, dadosAgrupados[ano].meses[mesIdx].semanas[semanaNum].dias[diaNum].total, turnosHtml, 3);
+                            });
+                            semanasHtml += createAccordionLevel(`Semana ${semanaNum}`, dadosAgrupados[ano].meses[mesIdx].semanas[semanaNum].total, diasHtml, 2);
+                        });
+                        mesesHtml += createAccordionLevel(mesesNomes[mesIdx], dadosAgrupados[ano].meses[mesIdx].total, semanasHtml, 1);
+                    });
+                    html += createAccordionLevel(ano, dadosAgrupados[ano].total, mesesHtml, 0);
+                });
+
+                container.innerHTML = html;
+
+                container.querySelectorAll('.accordion-header').forEach(header => {
+                    header.addEventListener('click', () => {
+                        const item = header.closest('.accordion-item');
+                        const content = item.querySelector('.accordion-content');
+                        item.classList.toggle('open');
+                        content.style.maxHeight = item.classList.contains('open') ? `${content.scrollHeight}px` : null;
+                    });
+                });
             }
 
             fetchData();
