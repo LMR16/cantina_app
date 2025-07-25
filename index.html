@@ -8,24 +8,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- 
-        Chosen Palette: Warm Neutrals (bg-stone-50, bg-white, text-stone-800, accent text-orange-600)
-        
-        Application Structure Plan: A tab-based Single Page Application (SPA) with four main sections: 
-        1. 'Painel Diário': A dashboard for at-a-glance daily metrics. This is the landing page for quick insights.
-        2. 'Registrar Venda': A task-oriented "shopping cart" interface for rapid order entry, which was a key user requirement for practicality.
-        3. 'Produtos': A catalog management view with tabs to filter between "Active" and "Inactive" products, simplifying inventory management.
-        4. 'Histórico': An exploratory, accordion-style drill-down report view, allowing users to navigate from yearly summaries down to individual sales.
-        This structure was chosen to separate distinct user tasks (viewing, creating, managing, analyzing) into clear, focused sections, improving usability and workflow efficiency.
-
-        Visualization & Content Choices:
-        - Daily Stats: Goal=Inform -> Method=HTML Stat Cards -> Interaction=None -> Justification=Clear, immediate display of key performance indicators.
-        - Sales Registration: Goal=Interact/Organize -> Method=Dynamic JS-powered list & cart -> Interaction=Click events on product cards and +/- buttons -> Justification=Provides a fast, intuitive point-of-sale experience.
-        - Product Catalog: Goal=Organize -> Method=HTML Tabs & Cards -> Interaction=Click on tabs to filter -> Justification=Clean separation of available and unavailable items.
-        - Sales History: Goal=Explore -> Method=Interactive HTML Accordion List -> Interaction=Click on headers to expand/collapse -> Justification=Enables powerful, intuitive data exploration from a high-level overview to granular details without changing views.
-
-        CONFIRMATION: NO SVG graphics used. NO Mermaid JS used.
-    -->
     <style>
         body { font-family: 'Inter', sans-serif; }
         .nav-button.active { background-color: #f97316; color: white; }
@@ -212,56 +194,49 @@
                 itens_venda: []
             };
 
-            // SUBSTITUA A FUNÇÃO ANTIGA POR ESTA
+            // =================================================================
+            // MUDANÇA IMPORTANTE AQUI!
+            // Esta função foi alterada para buscar os dados de forma sequencial,
+            // uma aba de cada vez, para evitar bloqueios por parte dos servidores da Google.
+            // =================================================================
             async function fetchData() {
                 showLoading(true);
-
-                // Helper para processar a resposta e dar erros detalhados
-                const processResponse = async (response, sheetName) => {
-                    if (!response.ok) {
-                        // Se a resposta não for OK (ex: status 404, 500, ou um redirecionamento),
-                        // vamos ler o corpo como texto e lançar um erro detalhado.
-                        const errorText = await response.text();
-                        throw new Error(`Falha ao buscar a aba '${sheetName}'. Status: ${response.status}. Resposta: ${errorText}`);
-                    }
-                    // Se a resposta for OK, tenta processar como JSON.
-                    return response.json().catch(err => {
-                        console.error(`Erro ao processar JSON da aba '${sheetName}'.`, err);
-                        throw new Error(`A resposta para a aba '${sheetName}' não é um JSON válido.`);
-                    });
-                };
-
                 try {
                     const sheetsToFetch = ['produtos', 'categorias', 'imagens', 'vendas', 'itens_venda'];
-                    const fetchPromises = sheetsToFetch.map(sheet => 
-                        fetch(`${SCRIPT_URL}?sheet=${sheet}`).then(res => processResponse(res, sheet))
-                    );
                     
-                    const [produtos, categorias, imagens, vendas, itensVenda] = await Promise.all(fetchPromises);
+                    const processResponse = async (response, sheetName) => {
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            throw new Error(`Falha ao buscar a aba '${sheetName}'. Status: ${response.status}. Resposta: ${errorText}`);
+                        }
+                        // Tenta processar a resposta como JSON. Se falhar, lança um erro claro.
+                        try {
+                            return await response.json();
+                        } catch (e) {
+                            console.error(`Erro ao processar JSON da aba '${sheetName}'.`, e);
+                            throw new Error(`A resposta para a aba '${sheetName}' não é um JSON válido.`);
+                        }
+                    };
 
-                    DB.produtos = produtos;
-                    DB.categorias = categorias;
-                    DB.imagens = imagens;
-                    DB.vendas = vendas;
-                    DB.itens_venda = itensVenda;
+                    // Busca os dados de cada aba, uma de cada vez (sequencialmente)
+                    console.log("Buscando dados de 'produtos'...");
+                    DB.produtos = await fetch(`${SCRIPT_URL}?sheet=produtos`).then(res => processResponse(res, 'produtos'));
+                    console.log("Buscando dados de 'categorias'...");
+                    DB.categorias = await fetch(`${SCRIPT_URL}?sheet=categorias`).then(res => processResponse(res, 'categorias'));
+                    console.log("Buscando dados de 'imagens'...");
+                    DB.imagens = await fetch(`${SCRIPT_URL}?sheet=imagens`).then(res => processResponse(res, 'imagens'));
+                    console.log("Buscando dados de 'vendas'...");
+                    DB.vendas = await fetch(`${SCRIPT_URL}?sheet=vendas`).then(res => processResponse(res, 'vendas'));
+                    console.log("Buscando dados de 'itens_venda'...");
+                    DB.itens_venda = await fetch(`${SCRIPT_URL}?sheet=itens_venda`).then(res => processResponse(res, 'itens_venda'));
                     
+                    console.log("Todos os dados foram carregados com sucesso.");
                     renderCurrentView();
-                }
 
-
-                // ...E SUBSTITUA PELO BLOCO ABAIXO:
-                catch (error) {
-                    // Constrói uma mensagem de erro bem detalhada
-                    const errorMessage = `Ocorreu um erro ao carregar os dados.\n\nDetalhes:\n${error.message}`;
-                    
-                    // Exibe a mensagem detalhada diretamente no alerta
+                } catch (error) {
+                    const errorMessage = `Ocorreu um erro crítico ao carregar os dados.\n\nDetalhes:\n${error.message}\n\nIsto pode ser um problema de conexão ou de permissão no Google. Verifique se a URL do Script está correta e se a planilha está acessível.`;
                     alert(errorMessage);
-                    
-                    // Registra as propriedades do erro separadamente no console para garantir
-                    console.error("=== INÍCIO DO ERRO DETALHADO ===");
-                    console.error("Mensagem completa do erro:", error.message);
-                    console.error("Stack Trace (onde ocorreu):", error.stack);
-                    console.error("=== FIM DO ERRO DETALHADO ===");
+                    console.error("=== ERRO DETALHADO EM fetchData ===", error);
                 } finally {
                     showLoading(false);
                 }
@@ -331,7 +306,7 @@
 
             function renderPainelDiario() {
                 const hoje = getTodayString();
-                const vendasHoje = DB.vendas.filter(v => v.Data.startsWith(hoje));
+                const vendasHoje = DB.vendas.filter(v => v.Data && v.Data.startsWith(hoje));
 
                 const totalHoje = vendasHoje.reduce((sum, v) => sum + v.TotalVenda, 0);
                 const totalPix = vendasHoje.filter(v => v.FormaPagamento === 'PIX').reduce((sum, v) => sum + v.TotalVenda, 0);
@@ -455,8 +430,8 @@
                 const novaVenda = {
                     Venda_ID: `V${Date.now()}`,
                     NomeComprador: document.getElementById('nome-comprador').value || 'Cliente',
-                    Data: dataAtual,
-                    TimestampVenda: dataAtual,
+                    Data: dataAtual.toISOString(),
+                    TimestampVenda: dataAtual.toISOString(),
                     Turno: dataAtual.getHours() >= 14 ? 'Noite' : 'Manhã',
                     FormaPagamento: appState.pagamento,
                     TotalVenda: totalVenda,
@@ -659,6 +634,7 @@
                 const mesesNomes = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
                 const dadosAgrupados = DB.vendas.reduce((acc, venda) => {
+                    if (!venda.Data) return acc; // Ignora vendas sem data
                     const data = new Date(venda.Data);
                     const ano = data.getFullYear();
                     const mes = data.getMonth();
