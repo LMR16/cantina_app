@@ -171,8 +171,8 @@
 
             const SHEET_GIDS = {
                 produtos: 0, // Substitua pelo GID real da aba 'produtos'
-                vendas: 169505950, // Substitua pelo GID real da aba 'vendas'
-                itens_venda: 1248145908 // Substitua pelo GID real da aba 'itens_venda'
+                vendas: 123456789, // Substitua pelo GID real da aba 'vendas'
+                itens_venda: 987654321 // Substitua pelo GID real da aba 'itens_venda'
             };
 
             let DB = {
@@ -373,6 +373,10 @@
                 });
             }
 
+            // =================================================================
+            // FUNÇÕES DE ESCRITA ATUALIZADAS PARA UI OTIMISTA
+            // =================================================================
+
             document.getElementById('salvar-venda').addEventListener('click', async () => {
                 const saveButton = document.getElementById('salvar-venda');
                 saveButton.disabled = true;
@@ -398,6 +402,18 @@
                     PrecoUnitario: parseFloat(item.Preco || 0),
                     Subtotal: parseFloat(item.Preco || 0) * item.Quantidade,
                 }));
+                
+                // Atualização Otimista
+                DB.vendas.push(novaVenda);
+                DB.itens_venda.push(...itensCarrinho);
+                
+                const carrinhoOriginal = [...appState.carrinho];
+                appState.carrinho = [];
+                appState.pagamento = null;
+                document.getElementById('nome-comprador').value = '';
+                document.querySelectorAll('.pagamento-btn').forEach(b => b.classList.remove('bg-orange-500', 'text-white'));
+                renderCarrinho();
+                alert('Venda salva com sucesso!');
 
                 try {
                     const response = await fetch(API_ENDPOINT, {
@@ -405,16 +421,13 @@
                         body: JSON.stringify({ action: 'saveSale', payload: { novaVenda, itensCarrinho } }),
                     });
                     if (!response.ok) throw new Error((await response.json()).error);
-                    
-                    alert('Venda salva com sucesso!');
-                    appState.carrinho = [];
-                    appState.pagamento = null;
-                    document.getElementById('nome-comprador').value = '';
-                    document.querySelectorAll('.pagamento-btn').forEach(b => b.classList.remove('bg-orange-500', 'text-white'));
-                    await fetchData();
-                    renderCarrinho();
+                    // Sucesso: a UI já está atualizada.
                 } catch (error) {
-                    alert(`Erro ao salvar venda: ${error.message}`);
+                    // Reverter em caso de erro
+                    alert(`ERRO: A venda não pôde ser salva na planilha. Por favor, recarregue a página. Detalhes: ${error.message}`);
+                    DB.vendas = DB.vendas.filter(v => v.Venda_ID !== novaVenda.Venda_ID);
+                    DB.itens_venda = DB.itens_venda.filter(i => i.Venda_Ref !== novaVenda.Venda_ID);
+                    appState.carrinho = carrinhoOriginal; // Restaura o carrinho
                 } finally {
                     saveButton.disabled = false;
                     saveButton.textContent = 'Salvar Venda';
@@ -503,7 +516,19 @@
                     Categoria_Ref: '', 
                     Imagem_Ref: '',
                 };
+                
+                const originalProduct = isUpdating ? { ...DB.produtos.find(p => p.Produto_ID === productId) } : null;
 
+                // Atualização Otimista
+                if (isUpdating) {
+                    const productIndex = DB.produtos.findIndex(p => p.Produto_ID === productId);
+                    DB.produtos[productIndex] = productData;
+                } else {
+                    DB.produtos.push(productData);
+                }
+                renderProdutos();
+                closeProductModal();
+                
                 const action = isUpdating ? 'updateProduct' : 'createProduct';
                 
                 try {
@@ -512,17 +537,31 @@
                         body: JSON.stringify({ action, payload: productData }),
                     });
                     if (!response.ok) throw new Error((await response.json()).error);
-                    
                     alert(`Produto ${isUpdating ? 'atualizado' : 'adicionado'} com sucesso!`);
-                    closeProductModal();
-                    await fetchData();
                 } catch (error) {
                     alert(`Erro ao salvar produto: ${error.message}`);
+                    // Reverter em caso de erro
+                    if (isUpdating) {
+                        const productIndex = DB.produtos.findIndex(p => p.Produto_ID === productId);
+                        DB.produtos[productIndex] = originalProduct;
+                    } else {
+                        DB.produtos = DB.produtos.filter(p => p.Produto_ID !== productData.Produto_ID);
+                    }
+                    renderProdutos();
                 }
             });
 
             async function handleDeleteProduct(productId) {
                 if (confirm('Tem certeza que deseja processar este produto? Se ele tiver vendas, será inativado. Caso contrário, será excluído.')) {
+                    
+                    const productIndex = DB.produtos.findIndex(p => p.Produto_ID === productId);
+                    const product = DB.produtos[productIndex];
+                    const originalProduct = { ...product };
+
+                    // Atualização Otimista
+                    DB.produtos = DB.produtos.filter(p => p.Produto_ID !== productId);
+                    renderProdutos();
+
                     try {
                         const response = await fetch(API_ENDPOINT, {
                             method: 'POST',
@@ -537,10 +576,17 @@
                         const result = await response.json();
                         if (!response.ok) throw new Error(result.error);
                         
-                        alert(result.message); // Exibe a mensagem do servidor (inativado ou excluído)
-                        await fetchData();
+                        alert(result.message);
+                        // Se foi inativado, precisamos de o adicionar de volta à DB e recarregar
+                        if (result.message.includes('inativado')) {
+                            await fetchData();
+                        }
+
                     } catch (error) {
                         alert(`Erro ao processar produto: ${error.message}`);
+                        // Reverter em caso de erro
+                        DB.produtos.splice(productIndex, 0, originalProduct);
+                        renderProdutos();
                     }
                 }
             }
