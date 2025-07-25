@@ -1,0 +1,8 @@
+{
+  "name": "painel-cantina-netlify",
+  "version": "1.0.0",
+  "description": "Função Netlify para ligar ao Google Sheets.",
+  "dependencies": {
+    "googleapis": "^105.0.0"
+  }
+}
