@@ -123,7 +123,6 @@
                 <section id="historico" class="view hidden">
                     <h2 class="text-2xl font-bold mb-4">Histórico de Vendas</h2>
                     
-                    <!-- NOVOS CONTROLOS DE ORDENAÇÃO -->
                     <div class="bg-white p-4 rounded-xl shadow-md mb-6">
                         <div class="flex flex-wrap gap-4 items-center">
                             <span class="font-semibold">Ordenar por:</span>
@@ -242,9 +241,8 @@
                 carrinho: [],
                 pagamento: null,
                 activeProductStatusTab: 'Ativo',
-                // NOVO ESTADO PARA ORDENAÇÃO
-                historicoSortBy: 'data', // 'data', 'valor', 'nome'
-                historicoSortOrder: 'decrescente' // 'crescente', 'decrescente'
+                historicoSortBy: 'data',
+                historicoSortOrder: 'decrescente'
             };
 
             const formatCurrency = (value) => {
@@ -278,7 +276,158 @@
                 renderMap[appState.currentView]();
             }
             
-            // ... (O resto do seu JavaScript permanece igual até a função renderHistorico)
+            // =================================================================
+            // INÍCIO DAS FUNÇÕES DE RENDERIZAÇÃO COMPLETAS
+            // =================================================================
+
+            function renderPainelDiario() {
+                const hoje = getTodayString();
+                const vendasHoje = DB.vendas.filter(v => v.Data && v.Data.startsWith(hoje));
+
+                const totalHoje = vendasHoje.reduce((sum, v) => sum + parseFloat(v.TotalVenda || 0), 0);
+                const totalPix = vendasHoje.filter(v => v.FormaPagamento === 'PIX').reduce((sum, v) => sum + parseFloat(v.TotalVenda || 0), 0);
+                const totalDinheiro = vendasHoje.filter(v => v.FormaPagamento === 'Dinheiro').reduce((sum, v) => sum + parseFloat(v.TotalVenda || 0), 0);
+
+                document.getElementById('total-hoje').textContent = formatCurrency(totalHoje);
+                document.getElementById('total-pix-hoje').textContent = formatCurrency(totalPix);
+                document.getElementById('total-dinheiro-hoje').textContent = formatCurrency(totalDinheiro);
+
+                const listaVendasEl = document.getElementById('lista-vendas-hoje');
+                listaVendasEl.innerHTML = '';
+                if (vendasHoje.length === 0) {
+                    listaVendasEl.innerHTML = '<p class="text-stone-500">Nenhuma venda registrada hoje.</p>';
+                    return;
+                }
+                vendasHoje.forEach(venda => {
+                    const vendaEl = document.createElement('div');
+                    vendaEl.className = 'flex justify-between items-center p-2 bg-stone-100 rounded-lg';
+                    vendaEl.innerHTML = `
+                        <div>
+                            <p class="font-semibold">${venda.NomeComprador || 'Cliente'}</p>
+                            <p class="text-sm text-stone-500">${venda.FormaPagamento}</p>
+                        </div>
+                        <p class="font-bold">${formatCurrency(venda.TotalVenda)}</p>
+                    `;
+                    listaVendasEl.appendChild(vendaEl);
+                });
+            }
+
+            function renderRegistrarVenda() {
+                const listaProdutosEl = document.getElementById('lista-produtos-venda');
+                listaProdutosEl.innerHTML = '';
+                DB.produtos.filter(p => p.Status === 'Ativo').forEach(produto => {
+                    const produtoCard = document.createElement('div');
+                    produtoCard.className = 'p-3 bg-stone-100 rounded-lg text-center cursor-pointer hover:bg-orange-100 transition-colors';
+                    produtoCard.innerHTML = `
+                        <p class="font-semibold">${produto.Nome}</p>
+                        <p class="text-sm text-stone-600">${formatCurrency(produto.Preco)}</p>
+                    `;
+                    produtoCard.addEventListener('click', () => adicionarAoCarrinho(produto.Produto_ID));
+                    listaProdutosEl.appendChild(produtoCard);
+                });
+                renderCarrinho();
+                setupPagamentoButtons();
+            }
+            
+            function adicionarAoCarrinho(produtoId) {
+                const itemExistente = appState.carrinho.find(item => item.Produto_ID === produtoId);
+                if (itemExistente) {
+                    itemExistente.Quantidade++;
+                } else {
+                    const produto = DB.produtos.find(p => p.Produto_ID === produtoId);
+                    appState.carrinho.push({ ...produto, Quantidade: 1 });
+                }
+                renderCarrinho();
+            }
+
+            function renderCarrinho() {
+                const carrinhoItensEl = document.getElementById('carrinho-itens');
+                carrinhoItensEl.innerHTML = '';
+                if (appState.carrinho.length === 0) {
+                    carrinhoItensEl.innerHTML = '<p class="text-stone-500 text-center pt-8">Carrinho vazio.</p>';
+                } else {
+                    appState.carrinho.forEach(item => {
+                        const itemEl = document.createElement('div');
+                        itemEl.className = 'flex items-center justify-between p-2 rounded-md hover:bg-stone-50';
+                        const precoTotalItem = parseFloat(item.Preco || 0) * item.Quantidade;
+                        itemEl.innerHTML = `
+                            <div>
+                                <p class="font-semibold">${item.Nome}</p>
+                                <p class="text-sm text-stone-500">${formatCurrency(precoTotalItem)}</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button data-id="${item.Produto_ID}" class="diminuir-item bg-stone-200 w-7 h-7 rounded-full font-bold hover:bg-red-200">-</button>
+                                <span>${item.Quantidade}</span>
+                                <button data-id="${item.Produto_ID}" class="aumentar-item bg-stone-200 w-7 h-7 rounded-full font-bold hover:bg-green-200">+</button>
+                            </div>
+                        `;
+                        carrinhoItensEl.appendChild(itemEl);
+                    });
+                }
+                
+                document.querySelectorAll('.aumentar-item').forEach(btn => btn.addEventListener('click', (e) => alterarQuantidade(e.target.dataset.id, 1)));
+                document.querySelectorAll('.diminuir-item').forEach(btn => btn.addEventListener('click', (e) => alterarQuantidade(e.target.dataset.id, -1)));
+
+                const total = appState.carrinho.reduce((sum, item) => sum + (parseFloat(item.Preco || 0) * item.Quantidade), 0);
+                document.getElementById('carrinho-total').textContent = formatCurrency(total);
+                document.getElementById('salvar-venda').disabled = appState.carrinho.length === 0 || !appState.pagamento;
+            }
+            
+            function alterarQuantidade(produtoId, delta) {
+                const item = appState.carrinho.find(item => item.Produto_ID === produtoId);
+                if (item) {
+                    item.Quantidade += delta;
+                    if (item.Quantidade <= 0) {
+                        appState.carrinho = appState.carrinho.filter(i => i.Produto_ID !== produtoId);
+                    }
+                }
+                renderCarrinho();
+            }
+
+            function setupPagamentoButtons() {
+                const pagamentoBtns = document.querySelectorAll('.pagamento-btn');
+                pagamentoBtns.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        appState.pagamento = btn.dataset.pagamento;
+                        pagamentoBtns.forEach(b => b.classList.remove('bg-orange-500', 'text-white'));
+                        btn.classList.add('bg-orange-500', 'text-white');
+                        renderCarrinho();
+                    });
+                });
+            }
+
+            function renderProdutos() {
+                const status = appState.activeProductStatusTab;
+                const listaProdutosEl = document.getElementById('lista-produtos-catalogo');
+                listaProdutosEl.innerHTML = '';
+                DB.produtos.filter(p => p.Status === status).forEach(produto => {
+                    const produtoCard = document.createElement('div');
+                    produtoCard.className = 'bg-white rounded-xl shadow-md overflow-hidden flex flex-col';
+                    produtoCard.innerHTML = `
+                        <div class="p-4 flex flex-col flex-grow">
+                            <h3 class="text-lg font-bold">${produto.Nome}</h3>
+                            <p class="text-stone-600 mb-2 h-10 overflow-hidden flex-grow">${produto.Descricao || ''}</p>
+                            <p class="text-xl font-bold text-right mt-2">${formatCurrency(produto.Preco)}</p>
+                        </div>
+                        <div class="bg-stone-50 p-2 flex justify-end gap-2">
+                            <button data-id="${produto.Produto_ID}" class="edit-product-btn p-2 rounded-full hover:bg-stone-200" title="Editar Produto">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-stone-600" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
+                            </button>
+                            <button data-id="${produto.Produto_ID}" class="delete-product-btn p-2 rounded-full hover:bg-stone-200" title="Excluir Produto">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
+                            </button>
+                        </div>
+                    `;
+                    listaProdutosEl.appendChild(produtoCard);
+                });
+
+                document.querySelectorAll('.edit-product-btn').forEach(btn => btn.addEventListener('click', (e) => openProductModal(e.currentTarget.dataset.id)));
+                document.querySelectorAll('.delete-product-btn').forEach(btn => btn.addEventListener('click', (e) => handleDeleteProduct(e.currentTarget.dataset.id)));
+            }
+
+            // =================================================================
+            // FIM DAS FUNÇÕES DE RENDERIZAÇÃO
+            // =================================================================
             
             document.getElementById('salvar-venda').addEventListener('click', async () => {
                 const saveButton = document.getElementById('salvar-venda');
@@ -333,7 +482,46 @@
                     saveButton.textContent = 'Salvar Venda';
                 }
             });
+            
+            document.querySelectorAll('.status-tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    appState.activeProductStatusTab = btn.dataset.status;
+                    document.querySelectorAll('.status-tab-btn').forEach(b => {
+                        b.classList.toggle('active', b === btn);
+                        b.classList.toggle('border-orange-500', b === btn);
+                        b.classList.toggle('text-stone-500', b !== btn);
+                        b.classList.toggle('border-transparent', b !== btn);
+                    });
+                    renderProdutos();
+                });
+            });
+            
+            document.getElementById('add-new-product-btn').addEventListener('click', () => openProductModal());
 
+            function openProductModal(productId = null) {
+                const form = document.getElementById('product-form');
+                form.reset();
+                if (productId) {
+                    const product = DB.produtos.find(p => p.Produto_ID === productId);
+                    document.getElementById('product-modal-title').textContent = 'Editar Produto';
+                    document.getElementById('product-id').value = product.Produto_ID;
+                    document.getElementById('product-name').value = product.Nome;
+                    document.getElementById('product-price').value = product.Preco;
+                    document.getElementById('product-description').value = product.Descricao;
+                    document.getElementById('product-status').value = product.Status;
+                } else {
+                    document.getElementById('product-modal-title').textContent = 'Adicionar Novo Produto';
+                    document.getElementById('product-id').value = '';
+                }
+                document.getElementById('product-modal').classList.remove('hidden');
+            }
+            
+            function closeProductModal() {
+                document.getElementById('product-modal').classList.add('hidden');
+            }
+
+            document.getElementById('cancel-product-modal').addEventListener('click', closeProductModal);
+            
             document.getElementById('product-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const productId = document.getElementById('product-id').value;
@@ -417,11 +605,7 @@
                     }
                 }
             }
-
-            // =================================================================
-            // FUNÇÃO DE HISTÓRICO ATUALIZADA
-            // =================================================================
-
+            
             function renderHistorico() {
                 const container = document.getElementById('historico-lista-container');
                 container.innerHTML = '';
@@ -493,7 +677,6 @@
                                 Object.keys(diaData.turnos).sort().forEach(turno => {
                                     const turnoData = diaData.turnos[turno];
                                     
-                                    // Aplicar ordenação à lista final de vendas
                                     const sortedVendas = [...turnoData.vendas].sort((a, b) => {
                                         if (appState.historicoSortBy === 'valor') {
                                             return (parseFloat(a.TotalVenda) - parseFloat(b.TotalVenda)) * sortOrderFactor;
@@ -501,7 +684,6 @@
                                         if (appState.historicoSortBy === 'nome') {
                                             return a.NomeComprador.localeCompare(b.NomeComprador) * sortOrderFactor;
                                         }
-                                        // Padrão é por data (timestamp)
                                         return (new Date(b.TimestampVenda) - new Date(a.TimestampVenda)) * sortOrderFactor;
                                     });
 
@@ -534,7 +716,6 @@
                 });
             }
             
-            // Event Listeners para os botões de ordenação
             document.getElementById('sort-by-group').addEventListener('click', (e) => {
                 if(e.target.tagName === 'BUTTON') {
                     appState.historicoSortBy = e.target.dataset.sort;
