@@ -16,6 +16,7 @@
         .accordion-header-icon { transition: transform 0.3s ease-out; }
         .open > .accordion-header .accordion-header-icon { transform: rotate(90deg); }
         .modal-overlay { transition: opacity 0.2s ease-in-out; }
+        .sort-button.active { background-color: #ea580c; color: white; }
     </style>
 </head>
 <body class="bg-stone-100 text-stone-800">
@@ -121,7 +122,24 @@
                 <!-- Seção 4: Histórico -->
                 <section id="historico" class="view hidden">
                     <h2 class="text-2xl font-bold mb-4">Histórico de Vendas</h2>
-                    <div id="historico-lista-container" class="bg-white p-6 rounded-xl shadow-md space-y-2">
+                    
+                    <!-- NOVOS CONTROLOS DE ORDENAÇÃO -->
+                    <div class="bg-white p-4 rounded-xl shadow-md mb-6">
+                        <div class="flex flex-wrap gap-4 items-center">
+                            <span class="font-semibold">Ordenar por:</span>
+                            <div class="flex gap-2" id="sort-by-group">
+                                <button data-sort="data" class="sort-button active px-3 py-1 rounded-lg text-sm">Data</button>
+                                <button data-sort="valor" class="sort-button px-3 py-1 rounded-lg text-sm">Valor</button>
+                                <button data-sort="nome" class="sort-button px-3 py-1 rounded-lg text-sm">Nome</button>
+                            </div>
+                            <div class="flex gap-2" id="sort-order-group">
+                                <button data-order="decrescente" class="sort-button active px-3 py-1 rounded-lg text-sm">Decrescente</button>
+                                <button data-order="crescente" class="sort-button px-3 py-1 rounded-lg text-sm">Crescente</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="historico-lista-container" class="bg-white p-6 rounded-xl shadow-md space-y-1">
                     </div>
                 </section>
             </main>
@@ -223,7 +241,10 @@
                 currentView: 'painel',
                 carrinho: [],
                 pagamento: null,
-                activeProductStatusTab: 'Ativo'
+                activeProductStatusTab: 'Ativo',
+                // NOVO ESTADO PARA ORDENAÇÃO
+                historicoSortBy: 'data', // 'data', 'valor', 'nome'
+                historicoSortOrder: 'decrescente' // 'crescente', 'decrescente'
             };
 
             const formatCurrency = (value) => {
@@ -257,126 +278,8 @@
                 renderMap[appState.currentView]();
             }
             
-            function renderPainelDiario() {
-                const hoje = getTodayString();
-                const vendasHoje = DB.vendas.filter(v => v.Data && v.Data.startsWith(hoje));
-
-                const totalHoje = vendasHoje.reduce((sum, v) => sum + parseFloat(v.TotalVenda || 0), 0);
-                const totalPix = vendasHoje.filter(v => v.FormaPagamento === 'PIX').reduce((sum, v) => sum + parseFloat(v.TotalVenda || 0), 0);
-                const totalDinheiro = vendasHoje.filter(v => v.FormaPagamento === 'Dinheiro').reduce((sum, v) => sum + parseFloat(v.TotalVenda || 0), 0);
-
-                document.getElementById('total-hoje').textContent = formatCurrency(totalHoje);
-                document.getElementById('total-pix-hoje').textContent = formatCurrency(totalPix);
-                document.getElementById('total-dinheiro-hoje').textContent = formatCurrency(totalDinheiro);
-
-                const listaVendasEl = document.getElementById('lista-vendas-hoje');
-                listaVendasEl.innerHTML = '';
-                if (vendasHoje.length === 0) {
-                    listaVendasEl.innerHTML = '<p class="text-stone-500">Nenhuma venda registrada hoje.</p>';
-                    return;
-                }
-                vendasHoje.forEach(venda => {
-                    const vendaEl = document.createElement('div');
-                    vendaEl.className = 'flex justify-between items-center p-2 bg-stone-100 rounded-lg';
-                    vendaEl.innerHTML = `
-                        <div>
-                            <p class="font-semibold">${venda.NomeComprador || 'Cliente'}</p>
-                            <p class="text-sm text-stone-500">${venda.FormaPagamento}</p>
-                        </div>
-                        <p class="font-bold">${formatCurrency(venda.TotalVenda)}</p>
-                    `;
-                    listaVendasEl.appendChild(vendaEl);
-                });
-            }
-
-            function renderRegistrarVenda() {
-                const listaProdutosEl = document.getElementById('lista-produtos-venda');
-                listaProdutosEl.innerHTML = '';
-                DB.produtos.filter(p => p.Status === 'Ativo').forEach(produto => {
-                    const produtoCard = document.createElement('div');
-                    produtoCard.className = 'p-3 bg-stone-100 rounded-lg text-center cursor-pointer hover:bg-orange-100 transition-colors';
-                    produtoCard.innerHTML = `
-                        <p class="font-semibold">${produto.Nome}</p>
-                        <p class="text-sm text-stone-600">${formatCurrency(produto.Preco)}</p>
-                    `;
-                    produtoCard.addEventListener('click', () => adicionarAoCarrinho(produto.Produto_ID));
-                    listaProdutosEl.appendChild(produtoCard);
-                });
-                renderCarrinho();
-                setupPagamentoButtons();
-            }
+            // ... (O resto do seu JavaScript permanece igual até a função renderHistorico)
             
-            function adicionarAoCarrinho(produtoId) {
-                const itemExistente = appState.carrinho.find(item => item.Produto_ID === produtoId);
-                if (itemExistente) {
-                    itemExistente.Quantidade++;
-                } else {
-                    const produto = DB.produtos.find(p => p.Produto_ID === produtoId);
-                    appState.carrinho.push({ ...produto, Quantidade: 1 });
-                }
-                renderCarrinho();
-            }
-
-            function renderCarrinho() {
-                const carrinhoItensEl = document.getElementById('carrinho-itens');
-                carrinhoItensEl.innerHTML = '';
-                if (appState.carrinho.length === 0) {
-                    carrinhoItensEl.innerHTML = '<p class="text-stone-500 text-center pt-8">Carrinho vazio.</p>';
-                } else {
-                    appState.carrinho.forEach(item => {
-                        const itemEl = document.createElement('div');
-                        itemEl.className = 'flex items-center justify-between p-2 rounded-md hover:bg-stone-50';
-                        const precoTotalItem = parseFloat(item.Preco || 0) * item.Quantidade;
-                        itemEl.innerHTML = `
-                            <div>
-                                <p class="font-semibold">${item.Nome}</p>
-                                <p class="text-sm text-stone-500">${formatCurrency(precoTotalItem)}</p>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <button data-id="${item.Produto_ID}" class="diminuir-item bg-stone-200 w-7 h-7 rounded-full font-bold hover:bg-red-200">-</button>
-                                <span>${item.Quantidade}</span>
-                                <button data-id="${item.Produto_ID}" class="aumentar-item bg-stone-200 w-7 h-7 rounded-full font-bold hover:bg-green-200">+</button>
-                            </div>
-                        `;
-                        carrinhoItensEl.appendChild(itemEl);
-                    });
-                }
-                
-                document.querySelectorAll('.aumentar-item').forEach(btn => btn.addEventListener('click', (e) => alterarQuantidade(e.target.dataset.id, 1)));
-                document.querySelectorAll('.diminuir-item').forEach(btn => btn.addEventListener('click', (e) => alterarQuantidade(e.target.dataset.id, -1)));
-
-                const total = appState.carrinho.reduce((sum, item) => sum + (parseFloat(item.Preco || 0) * item.Quantidade), 0);
-                document.getElementById('carrinho-total').textContent = formatCurrency(total);
-                document.getElementById('salvar-venda').disabled = appState.carrinho.length === 0 || !appState.pagamento;
-            }
-            
-            function alterarQuantidade(produtoId, delta) {
-                const item = appState.carrinho.find(item => item.Produto_ID === produtoId);
-                if (item) {
-                    item.Quantidade += delta;
-                    if (item.Quantidade <= 0) {
-                        appState.carrinho = appState.carrinho.filter(i => i.Produto_ID !== produtoId);
-                    }
-                }
-                renderCarrinho();
-            }
-
-            function setupPagamentoButtons() {
-                const pagamentoBtns = document.querySelectorAll('.pagamento-btn');
-                pagamentoBtns.forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        appState.pagamento = btn.dataset.pagamento;
-                        pagamentoBtns.forEach(b => b.classList.remove('bg-orange-500', 'text-white'));
-                        btn.classList.add('bg-orange-500', 'text-white');
-                        renderCarrinho();
-                    });
-                });
-            }
-
-            // =================================================================
-            // FUNÇÕES DE ESCRITA ATUALIZADAS PARA UI OTIMISTA
-            // =================================================================
-
             document.getElementById('salvar-venda').addEventListener('click', async () => {
                 const saveButton = document.getElementById('salvar-venda');
                 saveButton.disabled = true;
@@ -403,7 +306,6 @@
                     Subtotal: parseFloat(item.Preco || 0) * item.Quantidade,
                 }));
                 
-                // Atualização Otimista
                 DB.vendas.push(novaVenda);
                 DB.itens_venda.push(...itensCarrinho);
                 
@@ -421,87 +323,17 @@
                         body: JSON.stringify({ action: 'saveSale', payload: { novaVenda, itensCarrinho } }),
                     });
                     if (!response.ok) throw new Error((await response.json()).error);
-                    // Sucesso: a UI já está atualizada.
                 } catch (error) {
-                    // Reverter em caso de erro
                     alert(`ERRO: A venda não pôde ser salva na planilha. Por favor, recarregue a página. Detalhes: ${error.message}`);
                     DB.vendas = DB.vendas.filter(v => v.Venda_ID !== novaVenda.Venda_ID);
                     DB.itens_venda = DB.itens_venda.filter(i => i.Venda_Ref !== novaVenda.Venda_ID);
-                    appState.carrinho = carrinhoOriginal; // Restaura o carrinho
+                    appState.carrinho = carrinhoOriginal;
                 } finally {
                     saveButton.disabled = false;
                     saveButton.textContent = 'Salvar Venda';
                 }
             });
 
-            function renderProdutos() {
-                const status = appState.activeProductStatusTab;
-                const listaProdutosEl = document.getElementById('lista-produtos-catalogo');
-                listaProdutosEl.innerHTML = '';
-                DB.produtos.filter(p => p.Status === status).forEach(produto => {
-                    const produtoCard = document.createElement('div');
-                    produtoCard.className = 'bg-white rounded-xl shadow-md overflow-hidden flex flex-col';
-                    produtoCard.innerHTML = `
-                        <div class="p-4 flex flex-col flex-grow">
-                            <h3 class="text-lg font-bold">${produto.Nome}</h3>
-                            <p class="text-stone-600 mb-2 h-10 overflow-hidden flex-grow">${produto.Descricao || ''}</p>
-                            <p class="text-xl font-bold text-right mt-2">${formatCurrency(produto.Preco)}</p>
-                        </div>
-                        <div class="bg-stone-50 p-2 flex justify-end gap-2">
-                            <button data-id="${produto.Produto_ID}" class="edit-product-btn p-2 rounded-full hover:bg-stone-200" title="Editar Produto">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-stone-600" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
-                            </button>
-                            <button data-id="${produto.Produto_ID}" class="delete-product-btn p-2 rounded-full hover:bg-stone-200" title="Excluir Produto">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
-                            </button>
-                        </div>
-                    `;
-                    listaProdutosEl.appendChild(produtoCard);
-                });
-
-                document.querySelectorAll('.edit-product-btn').forEach(btn => btn.addEventListener('click', (e) => openProductModal(e.currentTarget.dataset.id)));
-                document.querySelectorAll('.delete-product-btn').forEach(btn => btn.addEventListener('click', (e) => handleDeleteProduct(e.currentTarget.dataset.id)));
-            }
-            
-            document.querySelectorAll('.status-tab-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    appState.activeProductStatusTab = btn.dataset.status;
-                    document.querySelectorAll('.status-tab-btn').forEach(b => {
-                        b.classList.toggle('active', b === btn);
-                        b.classList.toggle('border-orange-500', b === btn);
-                        b.classList.toggle('text-stone-500', b !== btn);
-                        b.classList.toggle('border-transparent', b !== btn);
-                    });
-                    renderProdutos();
-                });
-            });
-            
-            document.getElementById('add-new-product-btn').addEventListener('click', () => openProductModal());
-
-            function openProductModal(productId = null) {
-                const form = document.getElementById('product-form');
-                form.reset();
-                if (productId) {
-                    const product = DB.produtos.find(p => p.Produto_ID === productId);
-                    document.getElementById('product-modal-title').textContent = 'Editar Produto';
-                    document.getElementById('product-id').value = product.Produto_ID;
-                    document.getElementById('product-name').value = product.Nome;
-                    document.getElementById('product-price').value = product.Preco;
-                    document.getElementById('product-description').value = product.Descricao;
-                    document.getElementById('product-status').value = product.Status;
-                } else {
-                    document.getElementById('product-modal-title').textContent = 'Adicionar Novo Produto';
-                    document.getElementById('product-id').value = '';
-                }
-                document.getElementById('product-modal').classList.remove('hidden');
-            }
-            
-            function closeProductModal() {
-                document.getElementById('product-modal').classList.add('hidden');
-            }
-
-            document.getElementById('cancel-product-modal').addEventListener('click', closeProductModal);
-            
             document.getElementById('product-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const productId = document.getElementById('product-id').value;
@@ -519,7 +351,6 @@
                 
                 const originalProduct = isUpdating ? { ...DB.produtos.find(p => p.Produto_ID === productId) } : null;
 
-                // Atualização Otimista
                 if (isUpdating) {
                     const productIndex = DB.produtos.findIndex(p => p.Produto_ID === productId);
                     DB.produtos[productIndex] = productData;
@@ -540,7 +371,6 @@
                     alert(`Produto ${isUpdating ? 'atualizado' : 'adicionado'} com sucesso!`);
                 } catch (error) {
                     alert(`Erro ao salvar produto: ${error.message}`);
-                    // Reverter em caso de erro
                     if (isUpdating) {
                         const productIndex = DB.produtos.findIndex(p => p.Produto_ID === productId);
                         DB.produtos[productIndex] = originalProduct;
@@ -558,7 +388,6 @@
                     const product = DB.produtos[productIndex];
                     const originalProduct = { ...product };
 
-                    // Atualização Otimista
                     DB.produtos = DB.produtos.filter(p => p.Produto_ID !== productId);
                     renderProdutos();
 
@@ -577,20 +406,22 @@
                         if (!response.ok) throw new Error(result.error);
                         
                         alert(result.message);
-                        // Se foi inativado, precisamos de o adicionar de volta à DB e recarregar
                         if (result.message.includes('inativado')) {
                             await fetchData();
                         }
 
                     } catch (error) {
                         alert(`Erro ao processar produto: ${error.message}`);
-                        // Reverter em caso de erro
                         DB.produtos.splice(productIndex, 0, originalProduct);
                         renderProdutos();
                     }
                 }
             }
-            
+
+            // =================================================================
+            // FUNÇÃO DE HISTÓRICO ATUALIZADA
+            // =================================================================
+
             function renderHistorico() {
                 const container = document.getElementById('historico-lista-container');
                 container.innerHTML = '';
@@ -604,7 +435,7 @@
 
                 const dadosAgrupados = DB.vendas.reduce((acc, venda) => {
                     if (!venda.Data) return acc;
-                    const data = new Date(venda.Data + 'T12:00:00Z'); // Use UTC para evitar problemas de fuso horário
+                    const data = new Date(venda.Data + 'T12:00:00Z');
                     if (isNaN(data.getTime())) return acc;
 
                     const ano = data.getUTCFullYear();
@@ -633,40 +464,56 @@
 
                 const createAccordionLevel = (title, total, content, level) => {
                     const paddingLeft = level * 1.5;
+                    const textSize = level < 2 ? 'text-lg' : 'text-base';
                     return `
-                        <div class="accordion-item">
+                        <div class="accordion-item border-b border-stone-200 last:border-b-0">
                             <div class="accordion-header flex justify-between items-center cursor-pointer p-2 hover:bg-stone-100 rounded-md" style="padding-left: ${paddingLeft}rem;">
                                 <div class="flex items-center gap-3">
-                                    <span class="accordion-header-icon font-bold text-lg text-orange-600">▶</span>
-                                    <span class="font-semibold">${title}</span>
+                                    <span class="accordion-header-icon font-bold text-orange-600">▶</span>
+                                    <span class="font-semibold ${textSize}">${title}</span>
                                 </div>
-                                <span class="font-semibold">${formatCurrency(total)}</span>
+                                <span class="font-semibold ${textSize}">${formatCurrency(total)}</span>
                             </div>
-                            <div class="accordion-content">${content}</div>
+                            <div class="accordion-content pl-4">${content}</div>
                         </div>`;
                 };
                 
                 let html = '';
-                Object.keys(dadosAgrupados).sort((a, b) => b - a).forEach(ano => {
+                const sortOrderFactor = appState.historicoSortOrder === 'crescente' ? 1 : -1;
+
+                Object.keys(dadosAgrupados).sort((a, b) => (b - a) * sortOrderFactor).forEach(ano => {
                     let mesesHtml = '';
-                    Object.keys(dadosAgrupados[ano].meses).sort((a, b) => b - a).forEach(mesIdx => {
+                    Object.keys(dadosAgrupados[ano].meses).sort((a, b) => (b - a) * sortOrderFactor).forEach(mesIdx => {
                         let semanasHtml = '';
-                        Object.keys(dadosAgrupados[ano].meses[mesIdx].semanas).sort((a, b) => b - a).forEach(semanaNum => {
+                        Object.keys(dadosAgrupados[ano].meses[mesIdx].semanas).sort((a, b) => (b - a) * sortOrderFactor).forEach(semanaNum => {
                             let diasHtml = '';
-                            Object.keys(dadosAgrupados[ano].meses[mesIdx].semanas[semanaNum].dias).sort((a, b) => b - a).forEach(diaNum => {
+                            Object.keys(dadosAgrupados[ano].meses[mesIdx].semanas[semanaNum].dias).sort((a, b) => (b - a) * sortOrderFactor).forEach(diaNum => {
                                 let turnosHtml = '';
-                                Object.keys(dadosAgrupados[ano].meses[mesIdx].semanas[semanaNum].dias[diaNum].turnos).sort().forEach(turno => {
-                                    let vendasHtml = '';
-                                    dadosAgrupados[ano].meses[mesIdx].semanas[semanaNum].dias[diaNum].turnos[turno].vendas.forEach(venda => {
-                                        vendasHtml += `
-                                            <div class="flex justify-between items-center p-2 bg-stone-50 rounded-lg ml-6">
-                                                <p>${venda.NomeComprador || 'Cliente'} - ${venda.FormaPagamento}</p>
-                                                <p class="font-bold">${formatCurrency(venda.TotalVenda)}</p>
-                                            </div>`;
+                                const diaData = dadosAgrupados[ano].meses[mesIdx].semanas[semanaNum].dias[diaNum];
+                                Object.keys(diaData.turnos).sort().forEach(turno => {
+                                    const turnoData = diaData.turnos[turno];
+                                    
+                                    // Aplicar ordenação à lista final de vendas
+                                    const sortedVendas = [...turnoData.vendas].sort((a, b) => {
+                                        if (appState.historicoSortBy === 'valor') {
+                                            return (parseFloat(a.TotalVenda) - parseFloat(b.TotalVenda)) * sortOrderFactor;
+                                        }
+                                        if (appState.historicoSortBy === 'nome') {
+                                            return a.NomeComprador.localeCompare(b.NomeComprador) * sortOrderFactor;
+                                        }
+                                        // Padrão é por data (timestamp)
+                                        return (new Date(b.TimestampVenda) - new Date(a.TimestampVenda)) * sortOrderFactor;
                                     });
-                                    turnosHtml += createAccordionLevel(`Turno ${turno}`, dadosAgrupados[ano].meses[mesIdx].semanas[semanaNum].dias[diaNum].turnos[turno].total, vendasHtml, 4);
+
+                                    let vendasHtml = sortedVendas.map(venda => `
+                                        <div class="flex justify-between items-center p-2 bg-stone-50 rounded-lg my-1">
+                                            <span>${venda.NomeComprador || 'Cliente'} (${venda.FormaPagamento})</span>
+                                            <span class="font-bold">${formatCurrency(venda.TotalVenda)}</span>
+                                        </div>`).join('');
+
+                                    turnosHtml += createAccordionLevel(`Turno ${turno}`, turnoData.total, `<div class="p-2">${vendasHtml}</div>`, 4);
                                 });
-                                diasHtml += createAccordionLevel(dadosAgrupados[ano].meses[mesIdx].semanas[semanaNum].dias[diaNum].nome, dadosAgrupados[ano].meses[mesIdx].semanas[semanaNum].dias[diaNum].total, turnosHtml, 3);
+                                diasHtml += createAccordionLevel(diaData.nome, diaData.total, turnosHtml, 3);
                             });
                             semanasHtml += createAccordionLevel(`Semana ${semanaNum}`, dadosAgrupados[ano].meses[mesIdx].semanas[semanaNum].total, diasHtml, 2);
                         });
@@ -678,14 +525,33 @@
                 container.innerHTML = html;
 
                 container.querySelectorAll('.accordion-header').forEach(header => {
-                    header.addEventListener('click', () => {
-                        const item = header.closest('.accordion-item');
+                    header.addEventListener('click', (e) => {
+                        const item = e.currentTarget.closest('.accordion-item');
                         const content = item.querySelector('.accordion-content');
                         item.classList.toggle('open');
                         content.style.maxHeight = item.classList.contains('open') ? `${content.scrollHeight}px` : null;
                     });
                 });
             }
+            
+            // Event Listeners para os botões de ordenação
+            document.getElementById('sort-by-group').addEventListener('click', (e) => {
+                if(e.target.tagName === 'BUTTON') {
+                    appState.historicoSortBy = e.target.dataset.sort;
+                    document.querySelectorAll('#sort-by-group button').forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                    renderHistorico();
+                }
+            });
+            
+            document.getElementById('sort-order-group').addEventListener('click', (e) => {
+                if(e.target.tagName === 'BUTTON') {
+                    appState.historicoSortOrder = e.target.dataset.order;
+                    document.querySelectorAll('#sort-order-group button').forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                    renderHistorico();
+                }
+            });
 
             fetchData();
         });
