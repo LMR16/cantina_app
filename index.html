@@ -276,10 +276,6 @@
                 renderMap[appState.currentView]();
             }
             
-            // =================================================================
-            // INÍCIO DAS FUNÇÕES DE RENDERIZAÇÃO COMPLETAS
-            // =================================================================
-
             function renderPainelDiario() {
                 const hoje = getTodayString();
                 const vendasHoje = DB.vendas.filter(v => v.Data && v.Data.startsWith(hoje));
@@ -424,10 +420,6 @@
                 document.querySelectorAll('.edit-product-btn').forEach(btn => btn.addEventListener('click', (e) => openProductModal(e.currentTarget.dataset.id)));
                 document.querySelectorAll('.delete-product-btn').forEach(btn => btn.addEventListener('click', (e) => handleDeleteProduct(e.currentTarget.dataset.id)));
             }
-
-            // =================================================================
-            // FIM DAS FUNÇÕES DE RENDERIZAÇÃO
-            // =================================================================
             
             document.getElementById('salvar-venda').addEventListener('click', async () => {
                 const saveButton = document.getElementById('salvar-venda');
@@ -709,7 +701,7 @@
                 container.querySelectorAll('.accordion-header').forEach(header => {
                     header.addEventListener('click', (e) => {
                         const item = e.currentTarget.closest('.accordion-item');
-                        const content = item.querySelector('.accordion-content');
+                        const content = header.nextElementSibling; // CORREÇÃO APLICADA AQUI
                         item.classList.toggle('open');
                         content.style.maxHeight = item.classList.contains('open') ? `${content.scrollHeight}px` : null;
                     });
