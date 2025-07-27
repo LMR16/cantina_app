@@ -220,7 +220,9 @@
                     <p class="text-sm text-stone-600">Nota: A edição dos itens individuais da venda não é suportada.</p>
                 </div>
                 <div class="mt-6 flex justify-between items-center">
-                    <button type="button" id="delete-sale-btn" class="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">Excluir Venda</button>
+                    <button type="button" id="delete-sale-btn" class="p-2 rounded-full hover:bg-red-100" title="Excluir Venda">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-600" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
+                    </button>
                     <div class="flex gap-3">
                         <button type="button" id="cancel-sale-modal" class="px-4 py-2 bg-stone-200 text-stone-800 font-semibold rounded-lg hover:bg-stone-300">Cancelar</button>
                         <button type="submit" class="px-4 py-2 bg-orange-500 text-white font-semibold rounded-lg hover:bg-orange-600">Salvar Alterações</button>
@@ -668,22 +670,31 @@
                     const semanaDoMes = Math.ceil(data.getUTCDate() / 7);
                     const diaDoMes = data.getUTCDate();
                     
-                    if (!acc[ano]) acc[ano] = {};
-                    if (!acc[ano][mes]) acc[ano][mes] = {};
-                    if (!acc[ano][mes][semanaDoMes]) acc[ano][mes][semanaDoMes] = {};
-                    if (!acc[ano][mes][semanaDoMes][diaDoMes]) acc[ano][mes][semanaDoMes][diaDoMes] = [];
-                    acc[ano][mes][semanaDoMes][diaDoMes].push(venda);
+                    if (!acc[ano]) acc[ano] = { total: 0, meses: {} };
+                    if (!acc[ano].meses[mes]) acc[ano].meses[mes] = { total: 0, semanas: {} };
+                    if (!acc[ano].meses[mes].semanas[semanaDoMes]) acc[ano].meses[mes].semanas[semanaDoMes] = { total: 0, dias: {} };
+                    if (!acc[ano].meses[mes].semanas[semanaDoMes].dias[diaDoMes]) acc[ano].meses[mes].semanas[semanaDoMes].dias[diaDoMes] = { total: 0, vendas: [] };
+
+                    const totalVenda = parseFloat(venda.TotalVenda || 0);
+                    acc[ano].total += totalVenda;
+                    acc[ano].meses[mes].total += totalVenda;
+                    acc[ano].meses[mes].semanas[semanaDoMes].total += totalVenda;
+                    acc[ano].meses[mes].semanas[semanaDoMes].dias[diaDoMes].total += totalVenda;
+                    acc[ano].meses[mes].semanas[semanaDoMes].dias[diaDoMes].vendas.push(venda);
                     
                     return acc;
                 }, {});
 
-                const createAccordionItem = (text, level, filter) => {
+                const createAccordionItem = (text, level, filter, total) => {
                     const el = document.createElement('div');
                     el.className = `accordion-item-hist pl-${level * 2}`;
                     el.innerHTML = `
-                        <div class="history-nav-item accordion-header flex items-center gap-2 cursor-pointer p-2 hover:bg-stone-100 rounded-md">
-                            <span class="accordion-header-icon text-orange-600">▶</span>
-                            <span>${text}</span>
+                        <div class="history-nav-item accordion-header flex justify-between items-center gap-2 cursor-pointer p-2 hover:bg-stone-100 rounded-md">
+                            <div class="flex items-center gap-2">
+                                <span class="accordion-header-icon text-orange-600">▶</span>
+                                <span>${text}</span>
+                            </div>
+                            <span class="text-sm font-semibold text-stone-600">${formatCurrency(total)}</span>
                         </div>
                         <div class="accordion-content hidden pl-4"></div>`;
                     
@@ -701,23 +712,27 @@
                 };
 
                 Object.keys(dadosAgrupados).sort((a,b) => b-a).forEach(ano => {
+                    const anoData = dadosAgrupados[ano];
                     const anoFilter = { ano: parseInt(ano) };
-                    const anoItem = createAccordionItem(ano, 0, anoFilter);
+                    const anoItem = createAccordionItem(ano, 0, anoFilter, anoData.total);
                     const anoContent = anoItem.querySelector('.accordion-content');
                     
-                    Object.keys(dadosAgrupados[ano]).sort((a,b) => b-a).forEach(mesIdx => {
+                    Object.keys(anoData.meses).sort((a,b) => b-a).forEach(mesIdx => {
+                        const mesData = anoData.meses[mesIdx];
                         const mesFilter = { ...anoFilter, mes: parseInt(mesIdx) };
-                        const mesItem = createAccordionItem(mesesNomes[mesIdx], 1, mesFilter);
+                        const mesItem = createAccordionItem(mesesNomes[mesIdx], 1, mesFilter, mesData.total);
                         const mesContent = mesItem.querySelector('.accordion-content');
 
-                        Object.keys(dadosAgrupados[ano][mesIdx]).sort((a,b) => b-a).forEach(semanaNum => {
+                        Object.keys(mesData.semanas).sort((a,b) => b-a).forEach(semanaNum => {
+                            const semanaData = mesData.semanas[semanaNum];
                             const semanaFilter = { ...mesFilter, semana: parseInt(semanaNum) };
-                            const semanaItem = createAccordionItem(`Semana ${semanaNum}`, 2, semanaFilter);
+                            const semanaItem = createAccordionItem(`Semana ${semanaNum}`, 2, semanaFilter, semanaData.total);
                             const semanaContent = semanaItem.querySelector('.accordion-content');
 
-                            Object.keys(dadosAgrupados[ano][mesIdx][semanaNum]).sort((a,b) => b-a).forEach(diaNum => {
+                            Object.keys(semanaData.dias).sort((a,b) => b-a).forEach(diaNum => {
+                                const diaData = semanaData.dias[diaNum];
                                 const diaFilter = { ...semanaFilter, dia: parseInt(diaNum) };
-                                const diaItem = createAccordionItem(`Dia ${diaNum}`, 3, diaFilter);
+                                const diaItem = createAccordionItem(`Dia ${diaNum}`, 3, diaFilter, diaData.total);
                                 semanaContent.appendChild(diaItem);
                             });
                             mesContent.appendChild(semanaItem);
