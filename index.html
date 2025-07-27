@@ -700,11 +700,24 @@
 
                 container.querySelectorAll('.accordion-header').forEach(header => {
                     header.addEventListener('click', (e) => {
-                        e.stopPropagation(); // Impede que o clique se propague para acordeões pais
+                        e.stopPropagation(); 
                         const item = e.currentTarget.closest('.accordion-item');
                         const content = header.nextElementSibling;
                         item.classList.toggle('open');
-                        content.style.maxHeight = item.classList.contains('open') ? `${content.scrollHeight}px` : null;
+                        
+                        if (item.classList.contains('open')) {
+                            content.style.maxHeight = content.scrollHeight + 'px';
+                        } else {
+                            content.style.maxHeight = null;
+                        }
+
+                        // Recalcula a altura dos pais
+                        let parent = item.parentElement.closest('.accordion-item.open');
+                        while(parent) {
+                            const parentContent = parent.querySelector('.accordion-content');
+                            parentContent.style.maxHeight = parentContent.scrollHeight + 'px';
+                            parent = parent.parentElement.closest('.accordion-item.open');
+                        }
                     });
                 });
             }
