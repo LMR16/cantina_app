@@ -698,15 +698,14 @@
 
                 container.innerHTML = html;
 
-                // CORREÇÃO APLICADA AQUI
-                container.addEventListener('click', (e) => {
-                    const header = e.target.closest('.accordion-header');
-                    if (!header) return;
-
-                    const item = header.closest('.accordion-item');
-                    const content = header.nextElementSibling;
-                    item.classList.toggle('open');
-                    content.style.maxHeight = item.classList.contains('open') ? `${content.scrollHeight}px` : null;
+                container.querySelectorAll('.accordion-header').forEach(header => {
+                    header.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Impede que o clique se propague para acordeões pais
+                        const item = e.currentTarget.closest('.accordion-item');
+                        const content = header.nextElementSibling;
+                        item.classList.toggle('open');
+                        content.style.maxHeight = item.classList.contains('open') ? `${content.scrollHeight}px` : null;
+                    });
                 });
             }
             
