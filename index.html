@@ -12,11 +12,11 @@
         body { font-family: 'Inter', sans-serif; }
         .nav-button.active { background-color: #f97316; color: white; }
         .nav-button { transition: all 0.2s ease-in-out; text-align: left; }
-        /* A animação de altura foi removida para uma abordagem mais simples */
         .accordion-header-icon { transition: transform 0.3s ease-out; }
         .open > .accordion-header .accordion-header-icon { transform: rotate(90deg); }
         .modal-overlay { transition: opacity 0.2s ease-in-out; }
         .sort-button.active { background-color: #ea580c; color: white; }
+        .history-nav-item.active { background-color: #fff7ed; border-right: 3px solid #f97316; }
     </style>
 </head>
 <body class="bg-stone-100 text-stone-800">
@@ -119,26 +119,35 @@
                     </div>
                 </section>
 
-                <!-- Seção 4: Histórico -->
+                <!-- Seção 4: Histórico (NOVO LAYOUT) -->
                 <section id="historico" class="view hidden">
                     <h2 class="text-2xl font-bold mb-4">Histórico de Vendas</h2>
-                    
-                    <div class="bg-white p-4 rounded-xl shadow-md mb-6">
-                        <div class="flex flex-wrap gap-4 items-center">
-                            <span class="font-semibold">Ordenar por:</span>
-                            <div class="flex gap-2" id="sort-by-group">
-                                <button data-sort="data" class="sort-button active px-3 py-1 rounded-lg text-sm">Data</button>
-                                <button data-sort="valor" class="sort-button px-3 py-1 rounded-lg text-sm">Valor</button>
-                                <button data-sort="nome" class="sort-button px-3 py-1 rounded-lg text-sm">Nome</button>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <!-- Coluna da Navegação em Acordeão -->
+                        <div class="lg:col-span-1 bg-white p-4 rounded-xl shadow-md">
+                            <h3 class="font-semibold mb-2 text-lg">Navegar por Período</h3>
+                            <div id="historico-nav-container" class="space-y-1"></div>
+                        </div>
+                        <!-- Coluna para Exibir as Vendas -->
+                        <div class="lg:col-span-2">
+                            <div class="bg-white p-4 rounded-xl shadow-md mb-6">
+                                <div class="flex flex-wrap gap-4 items-center">
+                                    <span class="font-semibold">Ordenar por:</span>
+                                    <div class="flex gap-2" id="sort-by-group">
+                                        <button data-sort="data" class="sort-button active px-3 py-1 rounded-lg text-sm">Data</button>
+                                        <button data-sort="valor" class="sort-button px-3 py-1 rounded-lg text-sm">Valor</button>
+                                        <button data-sort="nome" class="sort-button px-3 py-1 rounded-lg text-sm">Nome</button>
+                                    </div>
+                                    <div class="flex gap-2" id="sort-order-group">
+                                        <button data-order="decrescente" class="sort-button active px-3 py-1 rounded-lg text-sm">Decrescente</button>
+                                        <button data-order="crescente" class="sort-button px-3 py-1 rounded-lg text-sm">Crescente</button>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="flex gap-2" id="sort-order-group">
-                                <button data-order="decrescente" class="sort-button active px-3 py-1 rounded-lg text-sm">Decrescente</button>
-                                <button data-order="crescente" class="sort-button px-3 py-1 rounded-lg text-sm">Crescente</button>
+                            <div id="historico-vendas-display" class="space-y-4">
+                                <p class="text-center text-stone-500 pt-10">Selecione um período à esquerda para ver as vendas.</p>
                             </div>
                         </div>
-                    </div>
-
-                    <div id="historico-lista-container" class="bg-white p-6 rounded-xl shadow-md space-y-1">
                     </div>
                 </section>
             </main>
@@ -175,6 +184,45 @@
                 <div class="mt-6 flex justify-end gap-3">
                     <button type="button" id="cancel-product-modal" class="px-4 py-2 bg-stone-200 text-stone-800 font-semibold rounded-lg hover:bg-stone-300">Cancelar</button>
                     <button type="submit" class="px-4 py-2 bg-orange-500 text-white font-semibold rounded-lg hover:bg-orange-600">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- NOVO Modal de Edição de Venda -->
+    <div id="sale-modal" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
+            <h2 id="sale-modal-title" class="text-2xl font-bold mb-4">Editar Venda</h2>
+            <form id="sale-form">
+                <input type="hidden" id="sale-id">
+                <div class="space-y-4">
+                    <div>
+                        <label for="sale-name" class="block text-sm font-medium text-stone-700">Nome do Comprador</label>
+                        <input type="text" id="sale-name" required class="mt-1 block w-full px-3 py-2 bg-stone-100 border border-stone-300 rounded-md shadow-sm">
+                    </div>
+                    <div>
+                        <label for="sale-date" class="block text-sm font-medium text-stone-700">Data</label>
+                        <input type="date" id="sale-date" required class="mt-1 block w-full px-3 py-2 bg-stone-100 border border-stone-300 rounded-md shadow-sm">
+                    </div>
+                    <div>
+                        <label for="sale-payment" class="block text-sm font-medium text-stone-700">Forma de Pagamento</label>
+                        <select id="sale-payment" class="mt-1 block w-full px-3 py-2 bg-stone-100 border border-stone-300 rounded-md shadow-sm">
+                            <option>PIX</option>
+                            <option>Dinheiro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="sale-shift" class="block text-sm font-medium text-stone-700">Turno</label>
+                        <select id="sale-shift" class="mt-1 block w-full px-3 py-2 bg-stone-100 border border-stone-300 rounded-md shadow-sm">
+                            <option>Manhã</option>
+                            <option>Noite</option>
+                        </select>
+                    </div>
+                    <p class="text-sm text-stone-600">Nota: A edição dos itens individuais da venda não é suportada.</p>
+                </div>
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" id="cancel-sale-modal" class="px-4 py-2 bg-stone-200 text-stone-800 font-semibold rounded-lg hover:bg-stone-300">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-orange-500 text-white font-semibold rounded-lg hover:bg-orange-600">Salvar Alterações</button>
                 </div>
             </form>
         </div>
@@ -700,7 +748,7 @@
 
                 container.querySelectorAll('.accordion-header').forEach(header => {
                     header.addEventListener('click', (e) => {
-                        e.stopPropagation(); 
+                        e.stopPropagation();
                         const item = e.currentTarget.closest('.accordion-item');
                         const content = item.querySelector('.accordion-content');
                         item.classList.toggle('open');

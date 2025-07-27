@@ -1,23 +1,17 @@
 const { google } = require('googleapis');
 
-// As credenciais e o ID da planilha são lidos das variáveis de ambiente do Netlify
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 const credentials = {
   client_email: process.env.GOOGLE_CLIENT_EMAIL,
   private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
 };
 
-// Helper para inicializar a autenticação
 function getAuth() {
   return new google.auth.GoogleAuth({
     credentials,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
 }
-
-// =============================================
-// FUNÇÕES DE MANIPULAÇÃO DA PLANILHA
-// =============================================
 
 async function getSheetData(sheets, range) {
   const response = await sheets.spreadsheets.values.get({
@@ -74,15 +68,10 @@ async function deleteRow(sheets, sheetId, rowIndex) {
     });
 }
 
-// =============================================
-// FUNÇÃO PRINCIPAL (HANDLER)
-// =============================================
-
 exports.handler = async (event) => {
   const auth = getAuth();
   const sheets = google.sheets({ version: 'v4', auth });
 
-  // Lógica para requisições GET (Leitura)
   if (event.httpMethod === 'GET') {
     try {
       const sheetName = event.queryStringParameters.sheet;
@@ -106,7 +95,6 @@ exports.handler = async (event) => {
     }
   }
 
-  // Lógica para requisições POST (Escrita)
   if (event.httpMethod === 'POST') {
     try {
       const body = JSON.parse(event.body);
@@ -143,24 +131,30 @@ exports.handler = async (event) => {
           return { statusCode: 200, body: JSON.stringify({ message: 'Produto atualizado com sucesso.' }) };
         }
         
-        // NOVA LÓGICA DE APAGAR PRODUTO
+        // NOVA AÇÃO PARA EDITAR VENDAS
+        case 'updateSale': {
+            // Nota: Esta função edita apenas os detalhes principais da venda na aba 'vendas'.
+            // A edição dos itens em 'itens_venda' não está implementada.
+            const { rowIndex, headers } = await findRowById(sheets, 'vendas', payload.Venda_ID);
+            if (rowIndex === -1) throw new Error('Venda não encontrada.');
+            const saleRow = headers.map(h => payload[h] !== undefined ? payload[h] : '');
+            await updateRow(sheets, `vendas!A${rowIndex}`, saleRow);
+            return { statusCode: 200, body: JSON.stringify({ message: 'Venda atualizada com sucesso.' }) };
+        }
+
         case 'handleDeleteProduct': {
             const { productId, productSheetGid } = payload;
-            
-            // 1. Verificar se o produto existe em 'itens_venda'
             const itensVendaData = await getSheetData(sheets, 'itens_venda');
             const itensHeaders = itensVendaData.shift();
             const produtoRefIndex = itensHeaders.indexOf('Produto_Ref');
             const isProductSold = itensVendaData.some(row => row[produtoRefIndex] === productId);
 
-            // 2. Encontrar o produto na aba 'produtos'
             const { rowIndex, headers, rowData } = await findRowById(sheets, 'produtos', productId);
             if (rowIndex === -1) throw new Error('Produto não encontrado para apagar.');
 
             if (isProductSold) {
-                // 3a. Se já foi vendido, INATIVAR
                 const statusIndex = headers.indexOf('Status');
-                if (statusIndex === -1) throw new Error("Coluna 'Status' não encontrada na aba de produtos.");
+                if (statusIndex === -1) throw new Error("Coluna 'Status' não encontrada.");
                 
                 let updatedProductData = [...rowData];
                 updatedProductData[statusIndex] = 'Inativo';
@@ -168,7 +162,6 @@ exports.handler = async (event) => {
                 await updateRow(sheets, `produtos!A${rowIndex}`, updatedProductData);
                 return { statusCode: 200, body: JSON.stringify({ message: 'Produto inativado pois possui histórico de vendas.' }) };
             } else {
-                // 3b. Se nunca foi vendido, APAGAR
                 await deleteRow(sheets, productSheetGid, rowIndex);
                 return { statusCode: 200, body: JSON.stringify({ message: 'Produto excluído permanentemente.' }) };
             }
