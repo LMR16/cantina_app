@@ -89,31 +89,68 @@ exports.handler = async (event) => {
 
       switch (action) {
         case 'saveSale': {
-          // ... (código inalterado)
+          const { novaVenda, itensCarrinho } = payload;
+          const vendasHeaders = (await getSheetData(sheets, 'vendas!1:1'))[0];
+          const itensHeaders = (await getSheetData(sheets, 'itens_venda!1:1'))[0];
+          
+          const vendaRow = vendasHeaders.map(h => novaVenda[h] || '');
+          await appendRow(sheets, 'vendas', vendaRow);
+
+          for (const item of itensCarrinho) {
+              const itemRow = itensHeaders.map(h => item[h] || '');
+              await appendRow(sheets, 'itens_venda', itemRow);
+          }
           return { statusCode: 200, body: JSON.stringify({ message: 'Venda salva com sucesso.' }) };
         }
         case 'createProduct': {
-          // ... (código inalterado)
+          const productHeaders = (await getSheetData(sheets, 'produtos!1:1'))[0];
+          const productRow = productHeaders.map(h => payload[h] || '');
+          await appendRow(sheets, 'produtos', productRow);
           return { statusCode: 200, body: JSON.stringify({ message: 'Produto criado com sucesso.' }) };
         }
         case 'updateProduct': {
-          // ... (código inalterado)
+          const { rowIndex, headers } = await findRowById(sheets, 'produtos', payload.Produto_ID);
+          if (rowIndex === -1) throw new Error('Produto não encontrado.');
+          const productRow = headers.map(h => payload[h] || '');
+          await updateRow(sheets, `produtos!A${rowIndex}`, productRow);
           return { statusCode: 200, body: JSON.stringify({ message: 'Produto atualizado com sucesso.' }) };
         }
         case 'updateSale': {
-          // ... (código inalterado)
-          return { statusCode: 200, body: JSON.stringify({ message: 'Venda atualizada com sucesso.' }) };
+            const { rowIndex, headers } = await findRowById(sheets, 'vendas', payload.Venda_ID);
+            if (rowIndex === -1) throw new Error('Venda não encontrada.');
+            const saleRow = headers.map(h => payload[h] !== undefined ? payload[h] : '');
+            await updateRow(sheets, `vendas!A${rowIndex}`, saleRow);
+            return { statusCode: 200, body: JSON.stringify({ message: 'Venda atualizada com sucesso.' }) };
         }
         case 'handleDeleteProduct': {
-          // ... (código inalterado)
+            const { productId, productSheetGid } = payload;
+            const itensVendaData = await getSheetData(sheets, 'itens_venda');
+            const itensHeaders = itensVendaData.shift();
+            const produtoRefIndex = itensHeaders.indexOf('Produto_Ref');
+            const isProductSold = itensVendaData.some(row => row[produtoRefIndex] === productId);
+
+            const { rowIndex, headers, rowData } = await findRowById(sheets, 'produtos', productId);
+            if (rowIndex === -1) throw new Error('Produto não encontrado para apagar.');
+
+            if (isProductSold) {
+                const statusIndex = headers.indexOf('Status');
+                if (statusIndex === -1) throw new Error("Coluna 'Status' não encontrada.");
+                
+                let updatedProductData = [...rowData];
+                updatedProductData[statusIndex] = 'Inativo';
+                
+                await updateRow(sheets, `produtos!A${rowIndex}`, updatedProductData);
+                return { statusCode: 200, body: JSON.stringify({ message: 'Produto inativado pois possui histórico de vendas.' }) };
+            } else {
+                await deleteRow(sheets, productSheetGid, rowIndex);
+                return { statusCode: 200, body: JSON.stringify({ message: 'Produto excluído permanentemente.' }) };
+            }
         }
         
-        // NOVA AÇÃO PARA APAGAR VENDAS
         case 'deleteSale': {
             const { saleId, salesSheetGid, itemsSheetGid } = payload;
             let deleteRequests = [];
 
-            // 1. Encontrar e marcar para apagar a venda principal
             const { rowIndex: saleRowIndex } = await findRowById(sheets, 'vendas', saleId);
             if (saleRowIndex > -1) {
                 deleteRequests.push({
@@ -123,14 +160,13 @@ exports.handler = async (event) => {
                 });
             }
 
-            // 2. Encontrar e marcar para apagar todos os itens da venda
             const itemsData = await getSheetData(sheets, 'itens_venda');
             const itemsHeaders = itemsData.shift();
             const vendaRefIndex = itemsHeaders.indexOf('Venda_Ref');
             
             itemsData.forEach((row, index) => {
                 if (row[vendaRefIndex] === saleId) {
-                    const rowIndexToDelete = index + 2; // +1 para o cabeçalho, +1 porque o índice é base 0
+                    const rowIndexToDelete = index + 2;
                     deleteRequests.push({
                         deleteDimension: {
                             range: { sheetId: itemsSheetGid, dimension: 'ROWS', startIndex: rowIndexToDelete - 1, endIndex: rowIndexToDelete }
@@ -139,7 +175,6 @@ exports.handler = async (event) => {
                 }
             });
 
-            // 3. Executar todas as exclusões de uma vez
             await batchDeleteRows(sheets, deleteRequests);
 
             return { statusCode: 200, body: JSON.stringify({ message: 'Venda e itens associados foram excluídos.' }) };
