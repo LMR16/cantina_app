@@ -121,7 +121,7 @@
                     </div>
                 </section>
 
-                <!-- Seção 4: Histórico (NOVO LAYOUT) -->
+                <!-- Seção 4: Histórico (LAYOUT ATUALIZADO) -->
                 <section id="historico" class="view hidden">
                     <h2 class="text-2xl font-bold mb-4">Histórico de Vendas</h2>
                     
@@ -132,9 +132,13 @@
                                 <label for="filtro-ano" class="text-sm font-medium text-stone-600">Ano</label>
                                 <select id="filtro-ano" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm rounded-md"></select>
                             </div>
-                            <div class="flex-grow">
-                                <label class="text-sm font-medium text-stone-600">Mês</label>
-                                <div id="filtro-meses" class="mt-1 flex flex-wrap gap-2"></div>
+                            <div>
+                                <label for="filtro-mes" class="text-sm font-medium text-stone-600">Mês</label>
+                                <select id="filtro-mes" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm rounded-md"></select>
+                            </div>
+                            <div>
+                                <label for="filtro-semana" class="text-sm font-medium text-stone-600">Semana</label>
+                                <select id="filtro-semana" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm rounded-md"></select>
                             </div>
                         </div>
                     </div>
@@ -142,9 +146,9 @@
                     <!-- Resumo do Período -->
                     <div id="historico-resumo" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"></div>
 
-                    <!-- Display de Vendas -->
-                    <div id="historico-vendas-display" class="space-y-6">
-                        <p class="text-center text-stone-500 p-10 bg-white rounded-xl shadow-md">Selecione um período para ver as vendas.</p>
+                    <!-- Display de Vendas (Lista Compacta) -->
+                    <div id="historico-vendas-display" class="bg-white rounded-xl shadow-md overflow-hidden">
+                        <p class="text-center text-stone-500 p-10">Selecione um período para ver as vendas.</p>
                     </div>
                 </section>
             </main>
@@ -243,10 +247,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             
             const API_ENDPOINT = `/.netlify/functions/sheets`;
-
-            // O GID não é mais necessário no frontend com as funções Netlify
-            // usando nomes de abas (ex: 'produtos', 'vendas')
-
+            
             let DB = {
                 produtos: [],
                 vendas: [],
@@ -261,6 +262,7 @@
                 historicoFiltro: {
                     ano: null,
                     mes: null,
+                    semana: null, // 'null' para todas as semanas
                 }
             };
 
@@ -298,7 +300,7 @@
                 } catch (error) {
                     console.error(`Erro na ação '${action}':`, error);
                     alert(`Erro ao processar sua solicitação: ${error.message}`);
-                    throw error; // Re-throw para que a função chamadora possa tratar
+                    throw error;
                 } finally {
                     showLoading(false);
                 }
@@ -307,7 +309,6 @@
             async function fetchData() {
                 showLoading(true, 'Carregando dados da planilha...');
                 try {
-                    // Usando Promise.all para buscar dados em paralelo
                     const sheetsToFetch = ['produtos', 'vendas', 'itens_venda'];
                     const responses = await Promise.all(
                         sheetsToFetch.map(sheet => fetch(`${API_ENDPOINT}?sheet=${sheet}`))
@@ -348,7 +349,7 @@
             }
             
             // =================================================================
-            // FUNÇÕES DE RENDERIZAÇÃO
+            // FUNÇÕES DE RENDERIZAÇÃO GERAL
             // =================================================================
 
             function renderCurrentView() {
@@ -358,10 +359,8 @@
                     produtos: renderProdutos,
                     historico: renderHistorico,
                 };
-                // Esconde todas as views e mostra a atual
                 document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
                 document.getElementById(appState.currentView).classList.remove('hidden');
-
                 renderMap[appState.currentView]();
             }
             
@@ -484,124 +483,146 @@
             }
             
             // =================================================================
-            // LÓGICA E RENDERIZAÇÃO DO NOVO HISTÓRICO
+            // LÓGICA E RENDERIZAÇÃO DO HISTÓRICO
             // =================================================================
 
+            function getWeekInfo(date) {
+                const d = new Date(date.getTime());
+                d.setHours(0, 0, 0, 0);
+                // Domingo é 0, Sábado é 6. Ajustamos para que a semana comece no domingo.
+                const dayOfWeek = d.getDay();
+                const startDate = new Date(d);
+                startDate.setDate(d.getDate() - dayOfWeek);
+                return startDate.toISOString().split('T')[0];
+            }
+
             function renderHistorico() {
-                const anos = [...new Set(DB.vendas.map(v => new Date(v.Data).getFullYear()))].sort((a,b) => b-a);
+                const anos = [...new Set(DB.vendas.map(v => new Date(v.Data).getFullYear()))].filter(Boolean).sort((a,b) => b-a);
                 const anoSelect = document.getElementById('filtro-ano');
                 anoSelect.innerHTML = anos.map(ano => `<option value="${ano}">${ano}</option>`).join('');
 
                 const now = new Date();
                 appState.historicoFiltro.ano = anoSelect.value || now.getFullYear();
                 appState.historicoFiltro.mes = now.getMonth();
+                appState.historicoFiltro.semana = null;
                 
                 anoSelect.value = appState.historicoFiltro.ano;
 
                 renderMonthFilters();
+                renderWeekFilters();
                 displayHistoricoVendas();
             }
 
             function renderMonthFilters() {
-                const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-                const mesesContainer = document.getElementById('filtro-meses');
-                mesesContainer.innerHTML = '';
+                const mesesNomes = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+                const mesSelect = document.getElementById('filtro-mes');
+                mesSelect.innerHTML = mesesNomes.map((nome, index) => `<option value="${index}">${nome}</option>`).join('');
+                mesSelect.value = appState.historicoFiltro.mes;
+            }
+
+            function renderWeekFilters() {
+                const { ano, mes } = appState.historicoFiltro;
+                const semanaSelect = document.getElementById('filtro-semana');
+                semanaSelect.innerHTML = '<option value="">Todas as Semanas</option>';
+
+                const vendasDoMes = DB.vendas.filter(v => {
+                    if (!v.Data) return false;
+                    const dataVenda = new Date(v.Data);
+                    return dataVenda.getFullYear() == ano && dataVenda.getMonth() == mes;
+                });
+
+                if (vendasDoMes.length === 0) return;
+
+                const weeks = [...new Set(vendasDoMes.map(v => getWeekInfo(new Date(v.Data))))]
+                    .sort((a,b) => new Date(a) - new Date(b));
                 
-                mesesNomes.forEach((nome, index) => {
-                    const isActive = index === appState.historicoFiltro.mes;
-                    const button = document.createElement('button');
-                    button.dataset.mes = index;
-                    button.textContent = nome;
-                    button.className = `history-filter-btn px-3 py-1.5 rounded-md text-sm font-semibold border-2 ${isActive ? 'active' : 'bg-white border-stone-300 hover:border-orange-400'}`;
-                    mesesContainer.appendChild(button);
+                weeks.forEach((weekStartDate, index) => {
+                    const startDate = new Date(weekStartDate);
+                    const formattedDate = `${String(startDate.getUTCDate()).padStart(2, '0')}/${String(startDate.getUTCMonth() + 1).padStart(2, '0')}`;
+                    const option = document.createElement('option');
+                    option.value = weekStartDate;
+                    option.textContent = `Semana ${index + 1} (${formattedDate})`;
+                    semanaSelect.appendChild(option);
                 });
             }
 
             function displayHistoricoVendas() {
-                const { ano, mes } = appState.historicoFiltro;
+                const { ano, mes, semana } = appState.historicoFiltro;
                 const displayContainer = document.getElementById('historico-vendas-display');
                 const resumoContainer = document.getElementById('historico-resumo');
-                displayContainer.innerHTML = '';
-                resumoContainer.innerHTML = '';
-
+                
                 const vendasFiltradas = DB.vendas.filter(v => {
                     if (!v.Data) return false;
                     const dataVenda = new Date(v.Data);
-                    return dataVenda.getFullYear() == ano && dataVenda.getMonth() == mes;
+                    const anoMatch = dataVenda.getFullYear() == ano;
+                    const mesMatch = dataVenda.getMonth() == mes;
+                    const semanaMatch = !semana || getWeekInfo(dataVenda) === semana;
+                    return anoMatch && mesMatch && semanaMatch;
                 }).sort((a, b) => new Date(b.TimestampVenda) - new Date(a.TimestampVenda));
 
                 // Calcular e renderizar resumo
-                const totalMes = vendasFiltradas.reduce((sum, v) => sum + parseFloat(v.TotalVenda || 0), 0);
-                const totalPixMes = vendasFiltradas.filter(v => v.FormaPagamento === 'PIX').reduce((sum, v) => sum + parseFloat(v.TotalVenda || 0), 0);
-                const totalDinheiroMes = vendasFiltradas.filter(v => v.FormaPagamento === 'Dinheiro').reduce((sum, v) => sum + parseFloat(v.TotalVenda || 0), 0);
+                const totalPeriodo = vendasFiltradas.reduce((sum, v) => sum + parseFloat(v.TotalVenda || 0), 0);
+                const totalPixPeriodo = vendasFiltradas.filter(v => v.FormaPagamento === 'PIX').reduce((sum, v) => sum + parseFloat(v.TotalVenda || 0), 0);
+                const totalDinheiroPeriodo = vendasFiltradas.filter(v => v.FormaPagamento === 'Dinheiro').reduce((sum, v) => sum + parseFloat(v.TotalVenda || 0), 0);
 
                 resumoContainer.innerHTML = `
                     <div class="bg-white p-6 rounded-xl shadow-md">
-                        <h3 class="font-semibold text-stone-500">Faturamento Total</h3>
-                        <p class="text-3xl font-bold text-orange-600">${formatCurrency(totalMes)}</p>
+                        <h3 class="font-semibold text-stone-500">Faturamento no Período</h3>
+                        <p class="text-3xl font-bold text-orange-600">${formatCurrency(totalPeriodo)}</p>
                     </div>
                     <div class="bg-white p-6 rounded-xl shadow-md">
                         <h3 class="font-semibold text-stone-500">Total em PIX</h3>
-                        <p class="text-3xl font-bold text-sky-600">${formatCurrency(totalPixMes)}</p>
+                        <p class="text-3xl font-bold text-sky-600">${formatCurrency(totalPixPeriodo)}</p>
                     </div>
                     <div class="bg-white p-6 rounded-xl shadow-md">
                         <h3 class="font-semibold text-stone-500">Total em Dinheiro</h3>
-                        <p class="text-3xl font-bold text-emerald-600">${formatCurrency(totalDinheiroMes)}</p>
+                        <p class="text-3xl font-bold text-emerald-600">${formatCurrency(totalDinheiroPeriodo)}</p>
                     </div>
                 `;
 
                 if (vendasFiltradas.length === 0) {
-                    displayContainer.innerHTML = '<p class="text-center text-stone-500 p-10 bg-white rounded-xl shadow-md">Nenhuma venda encontrada para este período.</p>';
+                    displayContainer.innerHTML = '<p class="text-center text-stone-500 p-10">Nenhuma venda encontrada para este período.</p>';
                     return;
                 }
 
-                // Agrupar por dia
-                const vendasPorDia = vendasFiltradas.reduce((acc, venda) => {
-                    const dia = venda.Data;
-                    if (!acc[dia]) acc[dia] = [];
-                    acc[dia].push(venda);
-                    return acc;
-                }, {});
-
-                // Renderizar vendas agrupadas
-                Object.keys(vendasPorDia).forEach(dia => {
-                    const diaContainer = document.createElement('div');
-                    const dataFormatada = new Date(dia).toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: 'long', year: 'numeric' });
-                    diaContainer.innerHTML = `<h3 class="text-xl font-bold mb-3 text-stone-700">${dataFormatada}</h3>`;
+                // Renderizar como tabela compacta
+                const table = document.createElement('table');
+                table.className = 'w-full text-sm text-left text-stone-500';
+                table.innerHTML = `
+                    <thead class="text-xs text-stone-700 uppercase bg-stone-50">
+                        <tr>
+                            <th scope="col" class="px-4 py-3">Data</th>
+                            <th scope="col" class="px-4 py-3">Comprador</th>
+                            <th scope="col" class="px-4 py-3">Itens</th>
+                            <th scope="col" class="px-4 py-3 text-right">Valor</th>
+                            <th scope="col" class="px-4 py-3 text-center">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>`;
+                
+                const tbody = table.querySelector('tbody');
+                vendasFiltradas.forEach(venda => {
+                    const itensDaVenda = DB.itens_venda
+                        .filter(i => i.Venda_Ref === venda.Venda_ID)
+                        .map(i => `${i.Quantidade}x ${i.NomeProduto}`)
+                        .join(', ');
                     
-                    const vendasGrid = document.createElement('div');
-                    vendasGrid.className = 'grid grid-cols-1 lg:grid-cols-2 gap-4';
-                    
-                    vendasPorDia[dia].forEach(venda => {
-                        const itensDaVenda = DB.itens_venda.filter(i => i.Venda_Ref === venda.Venda_ID);
-                        const vendaCard = document.createElement('div');
-                        vendaCard.className = 'bg-white p-4 rounded-xl shadow-md flex flex-col';
-                        vendaCard.innerHTML = `
-                            <div class="flex justify-between items-start mb-2">
-                                <div>
-                                    <p class="font-bold text-lg">${venda.NomeComprador || 'Cliente'}</p>
-                                    <p class="text-sm text-stone-500">${venda.FormaPagamento} • Turno ${venda.Turno}</p>
-                                </div>
-                                <p class="font-bold text-lg text-orange-600">${formatCurrency(venda.TotalVenda)}</p>
-                            </div>
-                            <div class="border-t border-stone-200 mt-2 pt-2 space-y-1 text-sm">
-                                ${itensDaVenda.map(item => `
-                                    <div class="flex justify-between">
-                                        <span>${item.Quantidade}x ${item.NomeProduto}</span>
-                                        <span>${formatCurrency(item.TotalItem)}</span>
-                                    </div>
-                                `).join('')}
-                            </div>
-                            <div class="mt-4 text-right">
-                                <button data-id="${venda.Venda_ID}" class="edit-sale-btn font-medium text-blue-600 hover:underline text-sm">Editar</button>
-                            </div>
-                        `;
-                        vendasGrid.appendChild(vendaCard);
-                    });
-                    
-                    diaContainer.appendChild(vendasGrid);
-                    displayContainer.appendChild(diaContainer);
+                    const tr = document.createElement('tr');
+                    tr.className = 'bg-white border-b hover:bg-stone-50';
+                    tr.innerHTML = `
+                        <td class="px-4 py-3 font-medium text-stone-900 whitespace-nowrap">${new Date(venda.Data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</td>
+                        <td class="px-4 py-3">${venda.NomeComprador || 'Cliente'}</td>
+                        <td class="px-4 py-3 text-stone-600">${itensDaVenda}</td>
+                        <td class="px-4 py-3 font-bold text-right">${formatCurrency(venda.TotalVenda)}</td>
+                        <td class="px-4 py-3 text-center">
+                            <button data-id="${venda.Venda_ID}" class="edit-sale-btn font-medium text-blue-600 hover:underline">Editar</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
                 });
+
+                displayContainer.innerHTML = '';
+                displayContainer.appendChild(table);
 
                 document.querySelectorAll('.edit-sale-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => openSaleModal(e.target.dataset.id));
@@ -679,24 +700,15 @@
                 
                 try {
                     await apiCall('saveSale', { novaVenda, itensCarrinho });
-                    
-                    // Atualiza o DB local para refletir a nova venda
                     DB.vendas.push(novaVenda);
                     DB.itens_venda.push(...itensCarrinho);
-
                     alert('Venda salva com sucesso!');
-                    
-                    // Limpa o estado
                     appState.carrinho = [];
                     appState.pagamento = null;
                     document.getElementById('nome-comprador').value = '';
                     document.querySelectorAll('.pagamento-btn').forEach(b => b.classList.remove('bg-orange-500', 'text-white'));
-                    
-                    // Renderiza a view atual (deve ser a de registro)
                     renderRegistrarVenda();
-
                 } catch (error) {
-                    // O erro já foi exibido pelo apiCall, mas podemos adicionar mais contexto se necessário
                     console.error("Falha ao salvar a venda:", error);
                 }
             }
@@ -737,13 +749,11 @@
 
                 try {
                     if (productId) {
-                        // Atualizar
                         await apiCall('updateProduct', payload);
                         const index = DB.produtos.findIndex(p => p.Produto_ID === productId);
                         DB.produtos[index] = payload;
                         alert('Produto atualizado com sucesso!');
                     } else {
-                        // Criar
                         payload.Produto_ID = `P${Date.now()}`;
                         await apiCall('createProduct', payload);
                         DB.produtos.push(payload);
@@ -761,7 +771,7 @@
                 try {
                     const result = await apiCall('handleDeleteProduct', { productId });
                     alert(result.message);
-                    await fetchData(); // Recarrega todos os dados para garantir consistência
+                    await fetchData();
                 } catch(error) {
                     console.error('Falha ao deletar/inativar produto', error);
                 }
@@ -828,7 +838,6 @@
             // INICIALIZAÇÃO E LISTENERS GERAIS
             // =================================================================
 
-            // Navegação principal
             document.querySelectorAll('.nav-button').forEach(button => {
                 button.addEventListener('click', () => {
                     appState.currentView = button.dataset.view;
@@ -838,10 +847,8 @@
                 });
             });
 
-            // Registrar Venda
             document.getElementById('salvar-venda').addEventListener('click', handleSaveSale);
 
-            // Produtos
             document.querySelectorAll('.status-tab-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     appState.activeProductStatusTab = e.target.dataset.status;
@@ -854,25 +861,28 @@
             document.getElementById('product-form').addEventListener('submit', handleProductFormSubmit);
             document.getElementById('cancel-product-modal').addEventListener('click', closeProductModal);
 
-            // Histórico
+            // Histórico Listeners
             document.getElementById('filtro-ano').addEventListener('change', (e) => {
                 appState.historicoFiltro.ano = parseInt(e.target.value);
+                appState.historicoFiltro.semana = null; // Reset week
+                renderWeekFilters();
                 displayHistoricoVendas();
             });
-            document.getElementById('filtro-meses').addEventListener('click', (e) => {
-                if (e.target.tagName === 'BUTTON') {
-                    appState.historicoFiltro.mes = parseInt(e.target.dataset.mes);
-                    renderMonthFilters(); // Re-render para atualizar o estilo 'active'
-                    displayHistoricoVendas();
-                }
+            document.getElementById('filtro-mes').addEventListener('change', (e) => {
+                appState.historicoFiltro.mes = parseInt(e.target.value);
+                appState.historicoFiltro.semana = null; // Reset week
+                renderWeekFilters();
+                displayHistoricoVendas();
+            });
+            document.getElementById('filtro-semana').addEventListener('change', (e) => {
+                appState.historicoFiltro.semana = e.target.value || null;
+                displayHistoricoVendas();
             });
 
-            // Modal de Venda
             document.getElementById('sale-form').addEventListener('submit', handleSaleFormSubmit);
             document.getElementById('cancel-sale-modal').addEventListener('click', closeSaleModal);
             document.getElementById('delete-sale-btn').addEventListener('click', handleDeleteSale);
 
-            // Inicia a aplicação
             fetchData();
         });
     </script>
