@@ -29,7 +29,6 @@
                 <h1 class="text-3xl font-bold text-stone-900">Painel da Cantina</h1>
                 <p class="text-stone-600 text-sm">Gerencie seu negócio</p>
             </header>
-
             <nav class="flex flex-col gap-3">
                 <button data-view="painel" class="nav-button active w-full px-4 py-3 rounded-lg font-semibold text-stone-700 hover:bg-orange-500 hover:text-white">Painel Diário</button>
                 <button data-view="registrar" class="nav-button w-full px-4 py-3 rounded-lg font-semibold text-stone-700 hover:bg-orange-500 hover:text-white">Registrar Venda</button>
@@ -269,6 +268,10 @@
 
             const getTodayString = () => new Date().toISOString().split('T')[0];
 
+            // =================================================================
+            // FUNÇÕES PRINCIPAIS E DE RENDERIZAÇÃO
+            // =================================================================
+
             async function fetchData() {
                 showLoading(true);
                 try {
@@ -497,16 +500,16 @@
 
                 const createAccordionItem = (text, level, filter, total) => {
                     const el = document.createElement('div');
-                    el.className = `accordion-item-hist pl-${level * 2}`;
+                    el.className = `accordion-item-hist`;
                     el.innerHTML = `
-                        <div class="history-nav-item accordion-header flex justify-between items-center gap-2 cursor-pointer p-2 hover:bg-stone-100 rounded-md text-sm">
+                        <div class="history-nav-item accordion-header flex justify-between items-center gap-2 cursor-pointer p-2 hover:bg-stone-100 rounded-md text-sm" style="padding-left: ${level * 1 + 0.5}rem;">
                             <div class="flex items-center gap-2">
                                 <span class="accordion-header-icon text-orange-600">▶</span>
                                 <span class="font-medium">${text}</span>
                             </div>
                             <span class="font-semibold text-stone-600">${formatCurrency(total)}</span>
                         </div>
-                        <div class="accordion-content hidden pl-4"></div>`;
+                        <div class="accordion-content hidden"></div>`;
                     
                     el.querySelector('.accordion-header').addEventListener('click', (e) => {
                         e.stopPropagation();
@@ -635,6 +638,23 @@
                 document.getElementById('sale-modal').classList.add('hidden');
             }
 
+            // =================================================================
+            // EVENT LISTENERS
+            // =================================================================
+
+            const navButtons = document.querySelectorAll('.nav-button');
+            const views = document.querySelectorAll('.view');
+
+            navButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    appState.currentView = button.dataset.view;
+                    navButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    views.forEach(view => view.classList.toggle('hidden', view.id !== appState.currentView));
+                    renderCurrentView();
+                });
+            });
+
             document.getElementById('cancel-sale-modal').addEventListener('click', closeSaleModal);
 
             document.getElementById('sale-form').addEventListener('submit', async (e) => {
@@ -718,19 +738,6 @@
                     e.target.classList.add('active');
                     document.querySelector('.history-nav-item.active')?.click();
                 }
-            });
-            
-            const navButtons = document.querySelectorAll('.nav-button');
-            const views = document.querySelectorAll('.view');
-
-            navButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    appState.currentView = button.dataset.view;
-                    navButtons.forEach(btn => btn.classList.remove('active'));
-                    button.classList.add('active');
-                    views.forEach(view => view.classList.toggle('hidden', view.id !== appState.currentView));
-                    renderCurrentView();
-                });
             });
 
             fetchData();
