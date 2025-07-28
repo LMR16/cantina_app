@@ -13,6 +13,10 @@ function getAuth() {
   });
 }
 
+// =============================================
+// FUNÇÕES DE MANIPULAÇÃO DA PLANILHA
+// =============================================
+
 async function getSheetData(sheets, range) {
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
@@ -50,15 +54,30 @@ async function findRowById(sheets, sheetName, id, idColumnIndex = 0) {
     return { rowIndex: -1, headers: null, rowData: null };
 }
 
+// NOVA FUNÇÃO HELPER para obter o ID interno da aba (Sheet ID)
+async function getSheetIdByName(sheets, sheetName) {
+    const spreadsheetMeta = await sheets.spreadsheets.get({
+        spreadsheetId: SPREADSHEET_ID,
+    });
+    const sheet = spreadsheetMeta.data.sheets.find(s => s.properties.title === sheetName);
+    if (!sheet) {
+        throw new Error(`Aba com o nome '${sheetName}' não foi encontrada.`);
+    }
+    return sheet.properties.sheetId;
+}
+
 async function batchDeleteRows(sheets, requests) {
     if (requests.length === 0) return;
-    // As exclusões devem ser ordenadas de forma decrescente para não afetar os índices das linhas seguintes
     requests.sort((a, b) => b.deleteDimension.range.startIndex - a.deleteDimension.range.startIndex);
     await sheets.spreadsheets.batchUpdate({
         spreadsheetId: SPREADSHEET_ID,
         resource: { requests },
     });
 }
+
+// =============================================
+// FUNÇÃO PRINCIPAL (HANDLER)
+// =============================================
 
 exports.handler = async (event) => {
   const auth = getAuth();
@@ -92,10 +111,8 @@ exports.handler = async (event) => {
           const { novaVenda, itensCarrinho } = payload;
           const vendasHeaders = (await getSheetData(sheets, 'vendas!1:1'))[0];
           const itensHeaders = (await getSheetData(sheets, 'itens_venda!1:1'))[0];
-          
           const vendaRow = vendasHeaders.map(h => novaVenda[h] || '');
           await appendRow(sheets, 'vendas', vendaRow);
-
           for (const item of itensCarrinho) {
               const itemRow = itensHeaders.map(h => item[h] || '');
               await appendRow(sheets, 'itens_venda', itemRow);
@@ -123,40 +140,36 @@ exports.handler = async (event) => {
             return { statusCode: 200, body: JSON.stringify({ message: 'Venda atualizada com sucesso.' }) };
         }
         case 'handleDeleteProduct': {
-            const { productId, productSheetGid } = payload;
+            const { productId } = payload;
             const itensVendaData = await getSheetData(sheets, 'itens_venda');
             const itensHeaders = itensVendaData.shift();
             const produtoRefIndex = itensHeaders.indexOf('Produto_Ref');
             const isProductSold = itensVendaData.some(row => row[produtoRefIndex] === productId);
-
             const { rowIndex, headers, rowData } = await findRowById(sheets, 'produtos', productId);
             if (rowIndex === -1) throw new Error('Produto não encontrado para apagar.');
-
             if (isProductSold) {
                 const statusIndex = headers.indexOf('Status');
                 if (statusIndex === -1) throw new Error("Coluna 'Status' não encontrada.");
-                
                 let updatedProductData = [...rowData];
                 updatedProductData[statusIndex] = 'Inativo';
-                
                 await updateRow(sheets, `produtos!A${rowIndex}`, updatedProductData);
                 return { statusCode: 200, body: JSON.stringify({ message: 'Produto inativado pois possui histórico de vendas.' }) };
             } else {
-                await deleteRow(sheets, productSheetGid, rowIndex);
+                const productSheetId = await getSheetIdByName(sheets, 'produtos');
+                await batchDeleteRows(sheets, [{ deleteDimension: { range: { sheetId: productSheetId, dimension: 'ROWS', startIndex: rowIndex - 1, endIndex: rowIndex } } }]);
                 return { statusCode: 200, body: JSON.stringify({ message: 'Produto excluído permanentemente.' }) };
             }
         }
-        
         case 'deleteSale': {
-            const { saleId, salesSheetGid, itemsSheetGid } = payload;
+            const { saleId } = payload;
             let deleteRequests = [];
+            const salesSheetId = await getSheetIdByName(sheets, 'vendas');
+            const itemsSheetId = await getSheetIdByName(sheets, 'itens_venda');
 
             const { rowIndex: saleRowIndex } = await findRowById(sheets, 'vendas', saleId);
             if (saleRowIndex > -1) {
                 deleteRequests.push({
-                    deleteDimension: {
-                        range: { sheetId: salesSheetGid, dimension: 'ROWS', startIndex: saleRowIndex - 1, endIndex: saleRowIndex }
-                    }
+                    deleteDimension: { range: { sheetId: salesSheetId, dimension: 'ROWS', startIndex: saleRowIndex - 1, endIndex: saleRowIndex } }
                 });
             }
 
@@ -168,18 +181,14 @@ exports.handler = async (event) => {
                 if (row[vendaRefIndex] === saleId) {
                     const rowIndexToDelete = index + 2;
                     deleteRequests.push({
-                        deleteDimension: {
-                            range: { sheetId: itemsSheetGid, dimension: 'ROWS', startIndex: rowIndexToDelete - 1, endIndex: rowIndexToDelete }
-                        }
+                        deleteDimension: { range: { sheetId: itemsSheetId, dimension: 'ROWS', startIndex: rowIndexToDelete - 1, endIndex: rowIndexToDelete } }
                     });
                 }
             });
 
             await batchDeleteRows(sheets, deleteRequests);
-
             return { statusCode: 200, body: JSON.stringify({ message: 'Venda e itens associados foram excluídos.' }) };
         }
-
         default:
           throw new Error('Ação desconhecida.');
       }
@@ -188,6 +197,5 @@ exports.handler = async (event) => {
       return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
     }
   }
-
   return { statusCode: 405, body: JSON.stringify({ error: 'Método não permitido.' }) };
 };

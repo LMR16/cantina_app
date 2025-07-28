@@ -12,11 +12,12 @@
         body { font-family: 'Inter', sans-serif; }
         .nav-button.active { background-color: #f97316; color: white; }
         .nav-button { transition: all 0.2s ease-in-out; text-align: left; }
+        .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
         .accordion-header-icon { transition: transform 0.3s ease-out; }
         .open > .accordion-header .accordion-header-icon { transform: rotate(90deg); }
         .modal-overlay { transition: opacity 0.2s ease-in-out; }
         .sort-button.active { background-color: #ea580c; color: white; }
-        .history-nav-item.active { background-color: #fff7ed; border-right: 3px solid #f97316; }
+        .history-nav-item.active { background-color: #fff7ed; border-right: 3px solid #f97316; font-weight: 600; }
     </style>
 </head>
 <body class="bg-stone-100 text-stone-800">
@@ -28,7 +29,6 @@
                 <h1 class="text-3xl font-bold text-stone-900">Painel da Cantina</h1>
                 <p class="text-stone-600 text-sm">Gerencie seu negócio</p>
             </header>
-
             <nav class="flex flex-col gap-3">
                 <button data-view="painel" class="nav-button active w-full px-4 py-3 rounded-lg font-semibold text-stone-700 hover:bg-orange-500 hover:text-white">Painel Diário</button>
                 <button data-view="registrar" class="nav-button w-full px-4 py-3 rounded-lg font-semibold text-stone-700 hover:bg-orange-500 hover:text-white">Registrar Venda</button>
@@ -142,8 +142,8 @@
                                     </div>
                                 </div>
                             </div>
-                            <div id="historico-vendas-display" class="space-y-4">
-                                <p class="text-center text-stone-500 pt-10">Selecione um período à esquerda para ver as vendas.</p>
+                            <div id="historico-vendas-display" class="bg-white rounded-xl shadow-md">
+                                <p class="text-center text-stone-500 p-10">Selecione um período à esquerda para ver as vendas.</p>
                             </div>
                         </div>
                     </div>
@@ -235,7 +235,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             
-            const API_ENDPOINT = '/.netlify/functions/sheets';
+            const API_ENDPOINT = `${window.location.origin}/.netlify/functions/sheets`;
 
             const SHEET_GIDS = {
                 produtos: 0, // Substitua pelo GID real da aba 'produtos'
@@ -250,6 +250,27 @@
                 vendas: [],
                 itens_venda: []
             };
+
+            const appState = {
+                currentView: 'painel',
+                carrinho: [],
+                pagamento: null,
+                activeProductStatusTab: 'Ativo',
+                historicoSortBy: 'data',
+                historicoSortOrder: 'decrescente'
+            };
+
+            const formatCurrency = (value) => {
+                const numValue = parseFloat(value);
+                if (isNaN(numValue)) return 'R$ 0,00';
+                return `R$ ${numValue.toFixed(2).replace('.', ',')}`;
+            }
+
+            const getTodayString = () => new Date().toISOString().split('T')[0];
+
+            // =================================================================
+            // FUNÇÕES PRINCIPAIS E DE RENDERIZAÇÃO
+            // =================================================================
 
             async function fetchData() {
                 showLoading(true);
@@ -286,37 +307,7 @@
                     if (overlay) overlay.remove();
                 }
             }
-
-            const appState = {
-                currentView: 'painel',
-                carrinho: [],
-                pagamento: null,
-                activeProductStatusTab: 'Ativo',
-                historicoSortBy: 'data',
-                historicoSortOrder: 'decrescente'
-            };
-
-            const formatCurrency = (value) => {
-                const numValue = parseFloat(value);
-                if (isNaN(numValue)) return 'R$ 0,00';
-                return `R$ ${numValue.toFixed(2).replace('.', ',')}`;
-            }
-
-            const getTodayString = () => new Date().toISOString().split('T')[0];
             
-            const navButtons = document.querySelectorAll('.nav-button');
-            const views = document.querySelectorAll('.view');
-
-            navButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    appState.currentView = button.dataset.view;
-                    navButtons.forEach(btn => btn.classList.remove('active'));
-                    button.classList.add('active');
-                    views.forEach(view => view.classList.toggle('hidden', view.id !== appState.currentView));
-                    renderCurrentView();
-                });
-            });
-
             function renderCurrentView() {
                 const renderMap = {
                     painel: renderPainelDiario,
@@ -472,188 +463,11 @@
                 document.querySelectorAll('.delete-product-btn').forEach(btn => btn.addEventListener('click', (e) => handleDeleteProduct(e.currentTarget.dataset.id)));
             }
             
-            document.getElementById('salvar-venda').addEventListener('click', async () => {
-                const saveButton = document.getElementById('salvar-venda');
-                saveButton.disabled = true;
-                saveButton.textContent = 'Salvando...';
-
-                const dataAtual = new Date();
-                const novaVenda = {
-                    Venda_ID: `V${Date.now()}`,
-                    NomeComprador: document.getElementById('nome-comprador').value || 'Cliente',
-                    Data: dataAtual.toISOString().split('T')[0],
-                    TimestampVenda: dataAtual.toISOString(),
-                    Turno: dataAtual.getHours() >= 14 ? 'Noite' : 'Manhã',
-                    FormaPagamento: appState.pagamento,
-                    TotalVenda: appState.carrinho.reduce((sum, item) => sum + (parseFloat(item.Preco || 0) * item.Quantidade), 0),
-                    Ano: dataAtual.getFullYear().toString(),
-                };
-
-                const itensCarrinho = appState.carrinho.map(item => ({
-                    ItemVenda_ID: `IV${Date.now()}${item.Produto_ID}`,
-                    Venda_Ref: novaVenda.Venda_ID,
-                    Produto_Ref: item.Produto_ID,
-                    Quantidade: item.Quantidade,
-                    PrecoUnitario: parseFloat(item.Preco || 0),
-                    Subtotal: parseFloat(item.Preco || 0) * item.Quantidade,
-                }));
-                
-                DB.vendas.push(novaVenda);
-                DB.itens_venda.push(...itensCarrinho);
-                
-                const carrinhoOriginal = [...appState.carrinho];
-                appState.carrinho = [];
-                appState.pagamento = null;
-                document.getElementById('nome-comprador').value = '';
-                document.querySelectorAll('.pagamento-btn').forEach(b => b.classList.remove('bg-orange-500', 'text-white'));
-                renderCarrinho();
-                alert('Venda salva com sucesso!');
-
-                try {
-                    const response = await fetch(API_ENDPOINT, {
-                        method: 'POST',
-                        body: JSON.stringify({ action: 'saveSale', payload: { novaVenda, itensCarrinho } }),
-                    });
-                    if (!response.ok) throw new Error((await response.json()).error);
-                } catch (error) {
-                    alert(`ERRO: A venda não pôde ser salva na planilha. Por favor, recarregue a página. Detalhes: ${error.message}`);
-                    DB.vendas = DB.vendas.filter(v => v.Venda_ID !== novaVenda.Venda_ID);
-                    DB.itens_venda = DB.itens_venda.filter(i => i.Venda_Ref !== novaVenda.Venda_ID);
-                    appState.carrinho = carrinhoOriginal;
-                } finally {
-                    saveButton.disabled = false;
-                    saveButton.textContent = 'Salvar Venda';
-                }
-            });
-            
-            document.querySelectorAll('.status-tab-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    appState.activeProductStatusTab = btn.dataset.status;
-                    document.querySelectorAll('.status-tab-btn').forEach(b => {
-                        b.classList.toggle('active', b === btn);
-                        b.classList.toggle('border-orange-500', b === btn);
-                        b.classList.toggle('text-stone-500', b !== btn);
-                        b.classList.toggle('border-transparent', b !== btn);
-                    });
-                    renderProdutos();
-                });
-            });
-            
-            document.getElementById('add-new-product-btn').addEventListener('click', () => openProductModal());
-
-            function openProductModal(productId = null) {
-                const form = document.getElementById('product-form');
-                form.reset();
-                if (productId) {
-                    const product = DB.produtos.find(p => p.Produto_ID === productId);
-                    document.getElementById('product-modal-title').textContent = 'Editar Produto';
-                    document.getElementById('product-id').value = product.Produto_ID;
-                    document.getElementById('product-name').value = product.Nome;
-                    document.getElementById('product-price').value = product.Preco;
-                    document.getElementById('product-description').value = product.Descricao;
-                    document.getElementById('product-status').value = product.Status;
-                } else {
-                    document.getElementById('product-modal-title').textContent = 'Adicionar Novo Produto';
-                    document.getElementById('product-id').value = '';
-                }
-                document.getElementById('product-modal').classList.remove('hidden');
-            }
-            
-            function closeProductModal() {
-                document.getElementById('product-modal').classList.add('hidden');
-            }
-
-            document.getElementById('cancel-product-modal').addEventListener('click', closeProductModal);
-            
-            document.getElementById('product-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const productId = document.getElementById('product-id').value;
-                const isUpdating = !!productId;
-
-                const productData = {
-                    Produto_ID: isUpdating ? productId : `P${Date.now()}`,
-                    Nome: document.getElementById('product-name').value,
-                    Preco: document.getElementById('product-price').value,
-                    Descricao: document.getElementById('product-description').value,
-                    Status: document.getElementById('product-status').value,
-                    Categoria_Ref: '', 
-                    Imagem_Ref: '',
-                };
-                
-                const originalProduct = isUpdating ? { ...DB.produtos.find(p => p.Produto_ID === productId) } : null;
-
-                if (isUpdating) {
-                    const productIndex = DB.produtos.findIndex(p => p.Produto_ID === productId);
-                    DB.produtos[productIndex] = productData;
-                } else {
-                    DB.produtos.push(productData);
-                }
-                renderProdutos();
-                closeProductModal();
-                
-                const action = isUpdating ? 'updateProduct' : 'createProduct';
-                
-                try {
-                    const response = await fetch(API_ENDPOINT, {
-                        method: 'POST',
-                        body: JSON.stringify({ action, payload: productData }),
-                    });
-                    if (!response.ok) throw new Error((await response.json()).error);
-                    alert(`Produto ${isUpdating ? 'atualizado' : 'adicionado'} com sucesso!`);
-                } catch (error) {
-                    alert(`Erro ao salvar produto: ${error.message}`);
-                    if (isUpdating) {
-                        const productIndex = DB.produtos.findIndex(p => p.Produto_ID === productId);
-                        DB.produtos[productIndex] = originalProduct;
-                    } else {
-                        DB.produtos = DB.produtos.filter(p => p.Produto_ID !== productData.Produto_ID);
-                    }
-                    renderProdutos();
-                }
-            });
-
-            async function handleDeleteProduct(productId) {
-                if (confirm('Tem certeza que deseja processar este produto? Se ele tiver vendas, será inativado. Caso contrário, será excluído.')) {
-                    
-                    const productIndex = DB.produtos.findIndex(p => p.Produto_ID === productId);
-                    const product = DB.produtos[productIndex];
-                    const originalProduct = { ...product };
-
-                    DB.produtos = DB.produtos.filter(p => p.Produto_ID !== productId);
-                    renderProdutos();
-
-                    try {
-                        const response = await fetch(API_ENDPOINT, {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                action: 'handleDeleteProduct',
-                                payload: {
-                                    productId: productId,
-                                    productSheetGid: SHEET_GIDS.produtos
-                                }
-                            }),
-                        });
-                        const result = await response.json();
-                        if (!response.ok) throw new Error(result.error);
-                        
-                        alert(result.message);
-                        if (result.message.includes('inativado')) {
-                            await fetchData();
-                        }
-
-                    } catch (error) {
-                        alert(`Erro ao processar produto: ${error.message}`);
-                        DB.produtos.splice(productIndex, 0, originalProduct);
-                        renderProdutos();
-                    }
-                }
-            }
-            
             function renderHistorico() {
                 const navContainer = document.getElementById('historico-nav-container');
                 navContainer.innerHTML = '';
                 if (!DB.vendas || DB.vendas.length === 0) {
-                    navContainer.innerHTML = '<p class="text-stone-500">Nenhum histórico.</p>';
+                    navContainer.innerHTML = '<p class="text-stone-500 p-2">Nenhum histórico.</p>';
                     return;
                 }
 
@@ -688,12 +502,12 @@
                     const el = document.createElement('div');
                     el.className = `accordion-item-hist pl-${level * 2}`;
                     el.innerHTML = `
-                        <div class="history-nav-item accordion-header flex justify-between items-center gap-2 cursor-pointer p-2 hover:bg-stone-100 rounded-md">
+                        <div class="history-nav-item accordion-header flex justify-between items-center gap-2 cursor-pointer p-2 hover:bg-stone-100 rounded-md text-sm">
                             <div class="flex items-center gap-2">
                                 <span class="accordion-header-icon text-orange-600">▶</span>
-                                <span>${text}</span>
+                                <span class="font-medium">${text}</span>
                             </div>
-                            <span class="text-sm font-semibold text-stone-600">${formatCurrency(total)}</span>
+                            <span class="font-semibold text-stone-600">${formatCurrency(total)}</span>
                         </div>
                         <div class="accordion-content hidden pl-4"></div>`;
                     
@@ -766,33 +580,47 @@
                 });
 
                 if (vendasFiltradas.length === 0) {
-                    displayContainer.innerHTML = '<p class="text-center text-stone-500 pt-10">Nenhuma venda encontrada para este período.</p>';
+                    displayContainer.innerHTML = '<p class="text-center text-stone-500 p-10">Nenhuma venda encontrada para este período.</p>';
                     return;
                 }
 
+                const table = document.createElement('table');
+                table.className = 'w-full text-sm text-left text-stone-500';
+                table.innerHTML = `
+                    <thead class="text-xs text-stone-700 uppercase bg-stone-50">
+                        <tr>
+                            <th scope="col" class="px-4 py-3">Comprador</th>
+                            <th scope="col" class="px-4 py-3">Data</th>
+                            <th scope="col" class="px-4 py-3">Turno</th>
+                            <th scope="col" class="px-4 py-3">Valor</th>
+                            <th scope="col" class="px-4 py-3">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>`;
+                
+                const tbody = table.querySelector('tbody');
                 vendasFiltradas.forEach(venda => {
-                    const vendaCard = document.createElement('div');
-                    vendaCard.className = 'bg-white p-4 rounded-xl shadow-md';
-                    vendaCard.innerHTML = `
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <p class="font-bold text-lg">${venda.NomeComprador || 'Cliente'}</p>
-                                <p class="text-sm text-stone-500">${new Date(venda.Data + 'T12:00:00Z').toLocaleDateString('pt-BR')} - ${venda.Turno}</p>
-                                <p class="text-sm text-stone-500">Pagamento: ${venda.FormaPagamento}</p>
-                            </div>
-                            <div class="text-right">
-                                <p class="font-bold text-xl text-orange-600">${formatCurrency(venda.TotalVenda)}</p>
-                                <button data-id="${venda.Venda_ID}" class="edit-sale-btn mt-2 text-sm text-blue-600 hover:underline">Editar</button>
-                            </div>
-                        </div>`;
-                    displayContainer.appendChild(vendaCard);
+                    const tr = document.createElement('tr');
+                    tr.className = 'bg-white border-b hover:bg-stone-50';
+                    tr.innerHTML = `
+                        <td class="px-4 py-3 font-medium text-stone-900">${venda.NomeComprador || 'Cliente'}</td>
+                        <td class="px-4 py-3">${new Date(venda.Data + 'T12:00:00Z').toLocaleDateString('pt-BR')}</td>
+                        <td class="px-4 py-3">${venda.Turno}</td>
+                        <td class="px-4 py-3 font-bold">${formatCurrency(venda.TotalVenda)}</td>
+                        <td class="px-4 py-3">
+                            <button data-id="${venda.Venda_ID}" class="edit-sale-btn font-medium text-blue-600 hover:underline">Editar</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
                 });
+
+                displayContainer.appendChild(table);
 
                 document.querySelectorAll('.edit-sale-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => openSaleModal(e.target.dataset.id));
                 });
             }
-
+            
             function openSaleModal(vendaId) {
                 const venda = DB.vendas.find(v => v.Venda_ID === vendaId);
                 if (!venda) return;
@@ -864,11 +692,7 @@
                             method: 'POST',
                             body: JSON.stringify({
                                 action: 'deleteSale',
-                                payload: {
-                                    saleId: vendaId,
-                                    salesSheetGid: SHEET_GIDS.vendas,
-                                    itemsSheetGid: SHEET_GIDS.itens_venda
-                                }
+                                payload: { saleId: vendaId }
                             })
                         });
                         if (!response.ok) throw new Error((await response.json()).error);
@@ -897,6 +721,20 @@
                     e.target.classList.add('active');
                     document.querySelector('.history-nav-item.active')?.click();
                 }
+            });
+            
+            // Adiciona os event listeners de navegação
+            const navButtons = document.querySelectorAll('.nav-button');
+            const views = document.querySelectorAll('.view');
+
+            navButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    appState.currentView = button.dataset.view;
+                    navButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    views.forEach(view => view.classList.toggle('hidden', view.id !== appState.currentView));
+                    renderCurrentView();
+                });
             });
 
             fetchData();
