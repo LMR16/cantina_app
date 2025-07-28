@@ -29,6 +29,7 @@
                 <h1 class="text-3xl font-bold text-stone-900">Painel da Cantina</h1>
                 <p class="text-stone-600 text-sm">Gerencie seu negócio</p>
             </header>
+
             <nav class="flex flex-col gap-3">
                 <button data-view="painel" class="nav-button active w-full px-4 py-3 rounded-lg font-semibold text-stone-700 hover:bg-orange-500 hover:text-white">Painel Diário</button>
                 <button data-view="registrar" class="nav-button w-full px-4 py-3 rounded-lg font-semibold text-stone-700 hover:bg-orange-500 hover:text-white">Registrar Venda</button>
@@ -235,7 +236,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             
-            const API_ENDPOINT = `${window.location.origin}/.netlify/functions/sheets`;
+            const API_ENDPOINT = `/.netlify/functions/sheets`;
 
             const SHEET_GIDS = {
                 produtos: 0, // Substitua pelo GID real da aba 'produtos'
@@ -267,10 +268,6 @@
             }
 
             const getTodayString = () => new Date().toISOString().split('T')[0];
-
-            // =================================================================
-            // FUNÇÕES PRINCIPAIS E DE RENDERIZAÇÃO
-            // =================================================================
 
             async function fetchData() {
                 showLoading(true);
@@ -723,7 +720,6 @@
                 }
             });
             
-            // Adiciona os event listeners de navegação
             const navButtons = document.querySelectorAll('.nav-button');
             const views = document.querySelectorAll('.view');
 
