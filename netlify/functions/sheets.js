@@ -54,7 +54,7 @@ async function findRowById(sheets, sheetName, id, idColumnIndex = 0) {
     return { rowIndex: -1, headers: null, rowData: null };
 }
 
-// Função para obter o ID interno da aba (Sheet ID) pelo nome
+// NOVA FUNÇÃO HELPER para obter o ID interno da aba (Sheet ID)
 async function getSheetIdByName(sheets, sheetName) {
     const spreadsheetMeta = await sheets.spreadsheets.get({
         spreadsheetId: SPREADSHEET_ID,
