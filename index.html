@@ -593,7 +593,7 @@
                         <tr>
                             <th scope="col" class="px-4 py-3">Data</th>
                             <th scope="col" class="px-4 py-3">Comprador</th>
-                            <th scope="col" class="px-4 py-3">Itens</th>
+                            <th scope="col" class="px-4 py-3">Detalhes</th>
                             <th scope="col" class="px-4 py-3 text-right">Valor</th>
                             <th scope="col" class="px-4 py-3 text-center">Ação</th>
                         </tr>
@@ -602,17 +602,15 @@
                 
                 const tbody = table.querySelector('tbody');
                 vendasFiltradas.forEach(venda => {
-                    const itensDaVenda = DB.itens_venda
-                        .filter(i => i.Venda_Ref === venda.Venda_ID)
-                        .map(i => `${i.Quantidade}x ${i.NomeProduto}`)
-                        .join(', ');
-                    
                     const tr = document.createElement('tr');
                     tr.className = 'bg-white border-b hover:bg-stone-50';
                     tr.innerHTML = `
                         <td class="px-4 py-3 font-medium text-stone-900 whitespace-nowrap">${new Date(venda.Data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</td>
                         <td class="px-4 py-3">${venda.NomeComprador || 'Cliente'}</td>
-                        <td class="px-4 py-3 text-stone-600">${itensDaVenda}</td>
+                        <td class="px-4 py-3 text-stone-600">
+                           <span class="font-semibold">${venda.Turno}</span>
+                           <span class="text-xs text-stone-500 block">${venda.FormaPagamento}</span>
+                        </td>
                         <td class="px-4 py-3 font-bold text-right">${formatCurrency(venda.TotalVenda)}</td>
                         <td class="px-4 py-3 text-center">
                             <button data-id="${venda.Venda_ID}" class="edit-sale-btn font-medium text-blue-600 hover:underline">Editar</button>
