@@ -18,6 +18,17 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Estilos para Notificações (Toasts) */
+        .toast {
+            transition: all 0.5s ease-in-out;
+            opacity: 0;
+            transform: translateX(100%);
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
     </style>
 </head>
 <body class="bg-stone-100 text-stone-800">
@@ -150,6 +161,9 @@
         </div>
     </div>
 
+    <!-- Container para Notificações (Toasts) -->
+    <div id="notification-container" class="fixed top-5 right-5 z-[100] space-y-3 w-full max-w-xs"></div>
+
     <!-- Modal de Edição/Criação de Produto -->
     <div id="product-modal" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
         <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
@@ -185,21 +199,17 @@
         </div>
     </div>
 
-    <!-- Modal de Edição de Venda (NOVO LAYOUT) -->
+    <!-- Modal de Edição de Venda -->
     <div id="sale-modal" class="modal-overlay fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
             <div class="p-6 border-b">
                 <h2 id="sale-modal-title" class="text-2xl font-bold">Editar Venda</h2>
             </div>
             <form id="sale-form" class="flex-grow grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 overflow-y-auto">
-                <!-- Coluna de Produtos -->
                 <div class="lg:col-span-1 flex flex-col">
                     <h3 class="text-lg font-bold mb-2">Adicionar Produtos</h3>
-                    <div id="sale-modal-products" class="flex-grow space-y-2 overflow-y-auto custom-scrollbar border rounded-lg p-2 bg-stone-50">
-                        <!-- Lista de produtos será inserida aqui -->
-                    </div>
+                    <div id="sale-modal-products" class="flex-grow space-y-2 overflow-y-auto custom-scrollbar border rounded-lg p-2 bg-stone-50"></div>
                 </div>
-                <!-- Coluna de Detalhes e Carrinho -->
                 <div class="lg:col-span-2 flex flex-col">
                     <input type="hidden" id="sale-id">
                     <div class="grid grid-cols-2 gap-4 mb-4">
@@ -227,9 +237,7 @@
                         </div>
                     </div>
                     <h3 class="text-lg font-bold mb-2">Itens da Venda</h3>
-                    <div id="sale-modal-cart" class="flex-grow space-y-2 overflow-y-auto custom-scrollbar border rounded-lg p-2 bg-stone-50">
-                        <!-- Carrinho de edição será inserido aqui -->
-                    </div>
+                    <div id="sale-modal-cart" class="flex-grow space-y-2 overflow-y-auto custom-scrollbar border rounded-lg p-2 bg-stone-50"></div>
                 </div>
             </form>
             <div class="p-6 border-t flex justify-between items-center bg-stone-50">
@@ -300,11 +308,48 @@
             };
 
             // =================================================================
+            // SISTEMA DE NOTIFICAÇÃO (TOAST)
+            // =================================================================
+            function showToast(message, type = 'success', duration = 4000) {
+                const container = document.getElementById('notification-container');
+                const toast = document.createElement('div');
+                const colors = {
+                    success: 'bg-green-500',
+                    error: 'bg-red-500',
+                    info: 'bg-blue-500'
+                };
+                
+                toast.className = `toast p-4 rounded-lg text-white shadow-lg ${colors[type]}`;
+                toast.textContent = message;
+
+                container.appendChild(toast);
+                
+                // Forçar o navegador a aplicar o estado inicial antes de adicionar a classe 'show'
+                requestAnimationFrame(() => {
+                    toast.classList.add('show');
+                });
+
+                if (duration > 0) {
+                    setTimeout(() => {
+                        toast.classList.remove('show');
+                        toast.addEventListener('transitionend', () => toast.remove());
+                    }, duration);
+                } else {
+                    toast.addEventListener('click', () => {
+                         toast.classList.remove('show');
+                         toast.addEventListener('transitionend', () => toast.remove());
+                    });
+                }
+            }
+
+            // =================================================================
             // FUNÇÕES DE DADOS E API
             // =================================================================
             
-            async function apiCall(action, payload) {
-                showLoading(true, `Processando: ${action}...`);
+            async function apiCall(action, payload, options = { background: false }) {
+                if (!options.background) {
+                    showLoading(true, `Processando: ${action}...`);
+                }
                 try {
                     const response = await fetch(API_ENDPOINT, {
                         method: 'POST',
@@ -318,10 +363,13 @@
                     return await response.json();
                 } catch (error) {
                     console.error(`Erro na ação '${action}':`, error);
-                    alert(`Erro ao processar sua solicitação: ${error.message}`);
+                    // Mostra o erro como um toast em vez de alert
+                    showToast(`Erro: ${error.message}`, 'error', 0); // 0 para erro persistente
                     throw error;
                 } finally {
-                    showLoading(false);
+                    if (!options.background) {
+                       showLoading(false);
+                    }
                 }
             }
 
@@ -335,8 +383,7 @@
 
                     for (const response of responses) {
                         if (!response.ok) {
-                            const errorData = await response.json().catch(() => ({}));
-                            throw new Error(`Falha ao buscar dados. Status: ${response.status}. Mensagem: ${errorData.error || 'Erro desconhecido'}`);
+                             throw new Error(`Falha ao buscar dados. Verifique a conexão e a planilha.`);
                         }
                     }
                     
@@ -347,7 +394,7 @@
                     
                     renderCurrentView();
                 } catch (error) {
-                    alert(`Ocorreu um erro crítico ao carregar os dados:\n\n${error.message}\n\nVerifique sua conexão e as configurações da planilha.`);
+                    showToast(error.message, 'error', 0);
                     console.error("=== ERRO DETALHADO EM fetchData ===", error);
                 } finally {
                     showLoading(false);
@@ -681,18 +728,17 @@
                 });
             }
             
-            async function handleSaveSale() {
+            function handleSaveSale() {
                 if (appState.carrinho.length === 0 || !appState.pagamento) {
-                    alert('Adicione itens ao carrinho e selecione uma forma de pagamento.');
+                    showToast('Adicione itens e escolha o pagamento.', 'error');
                     return;
                 }
 
                 const timestamp = new Date();
-                const vendaId = `V${timestamp.getTime()}`;
                 const totalVenda = appState.carrinho.reduce((sum, item) => sum + (parseFloat(item.Preco || 0) * item.Quantidade), 0);
                 
                 const novaVenda = {
-                    Venda_ID: vendaId,
+                    Venda_ID: `V${timestamp.getTime()}`,
                     TimestampVenda: timestamp.toISOString(),
                     Data: timestamp.toISOString().split('T')[0],
                     Turno: timestamp.getHours() < 17 ? 'Manhã' : 'Noite',
@@ -704,7 +750,7 @@
 
                 const itensCarrinho = appState.carrinho.map((item, index) => ({
                     ItemVenda_ID: `I${timestamp.getTime()}-${index}`,
-                    Venda_Ref: vendaId,
+                    Venda_Ref: novaVenda.Venda_ID,
                     Produto_Ref: item.Produto_ID,
                     NomeProduto: item.Nome,
                     PrecoUnitario: parseFloat(item.Preco).toFixed(2),
@@ -712,19 +758,26 @@
                     TotalItem: (parseFloat(item.Preco) * item.Quantidade).toFixed(2)
                 }));
                 
-                try {
-                    await apiCall('saveSale', { novaVenda, itensCarrinho });
-                    DB.vendas.push(novaVenda);
-                    DB.itens_venda.push(...itensCarrinho);
-                    alert('Venda salva com sucesso!');
-                    appState.carrinho = [];
-                    appState.pagamento = null;
-                    document.getElementById('nome-comprador').value = '';
-                    document.querySelectorAll('.pagamento-btn').forEach(b => b.classList.remove('bg-orange-500', 'text-white'));
-                    renderRegistrarVenda();
-                } catch (error) {
-                    console.error("Falha ao salvar a venda:", error);
-                }
+                // --- UI Otimista ---
+                // 1. Atualiza o DB local
+                DB.vendas.push(novaVenda);
+                DB.itens_venda.push(...itensCarrinho);
+                
+                // 2. Limpa a UI
+                showToast('Venda registrada com sucesso!');
+                appState.carrinho = [];
+                appState.pagamento = null;
+                document.getElementById('nome-comprador').value = '';
+                document.querySelectorAll('.pagamento-btn').forEach(b => b.classList.remove('bg-orange-500', 'text-white'));
+                renderRegistrarVenda(); // Re-renderiza a view de registro
+                renderPainelDiario(); // Atualiza o painel diário também
+
+                // 3. Envia para a API em segundo plano
+                apiCall('saveSale', { novaVenda, itensCarrinho }, { background: true })
+                    .catch(error => {
+                        showToast('Falha ao salvar venda na nuvem. Verifique a conexão.', 'error', 0);
+                        // Opcional: implementar lógica para tentar novamente
+                    });
             }
 
             // --- Handlers de Produto ---
@@ -750,7 +803,7 @@
                 document.getElementById('product-modal').classList.add('hidden');
             }
 
-            async function handleProductFormSubmit(e) {
+            function handleProductFormSubmit(e) {
                 e.preventDefault();
                 const productId = document.getElementById('product-id').value;
                 const payload = {
@@ -760,35 +813,53 @@
                     Descricao: document.getElementById('product-description').value,
                     Status: document.getElementById('product-status').value,
                 };
+                
+                closeProductModal();
 
-                try {
-                    if (productId) {
-                        await apiCall('updateProduct', payload);
-                        const index = DB.produtos.findIndex(p => p.Produto_ID === productId);
-                        DB.produtos[index] = payload;
-                        alert('Produto atualizado com sucesso!');
-                    } else {
-                        payload.Produto_ID = `P${Date.now()}`;
-                        await apiCall('createProduct', payload);
-                        DB.produtos.push(payload);
-                        alert('Produto criado com sucesso!');
-                    }
-                    closeProductModal();
+                if (productId) {
+                    // ATUALIZAR
+                    const originalProduct = { ...DB.produtos.find(p => p.Produto_ID === productId) };
+                    const index = DB.produtos.findIndex(p => p.Produto_ID === productId);
+                    DB.produtos[index] = payload;
+                    showToast('Produto atualizado!');
                     renderProdutos();
-                } catch (error) {
-                    console.error('Falha ao salvar produto', error);
+                    apiCall('updateProduct', payload, { background: true })
+                        .catch(err => { 
+                            DB.produtos[index] = originalProduct; // Reverte
+                            renderProdutos();
+                            showToast('Falha ao atualizar produto.', 'error', 0);
+                        });
+                } else {
+                    // CRIAR
+                    payload.Produto_ID = `P${Date.now()}`;
+                    DB.produtos.push(payload);
+                    showToast('Produto criado com sucesso!');
+                    renderProdutos();
+                    apiCall('createProduct', payload, { background: true })
+                        .catch(err => {
+                            DB.produtos = DB.produtos.filter(p => p.Produto_ID !== payload.Produto_ID); // Reverte
+                            renderProdutos();
+                            showToast('Falha ao criar produto.', 'error', 0);
+                        });
                 }
             }
 
-            async function handleDeleteProduct(productId) {
+            function handleDeleteProduct(productId) {
                 if (!confirm('Tem certeza? Se o produto tiver vendas, ele será Inativado. Caso contrário, será excluído permanentemente.')) return;
-                try {
-                    const result = await apiCall('handleDeleteProduct', { productId });
-                    alert(result.message);
-                    await fetchData();
-                } catch(error) {
-                    console.error('Falha ao deletar/inativar produto', error);
-                }
+                
+                // UI Otimista
+                const originalProducts = JSON.parse(JSON.stringify(DB.produtos));
+                
+                apiCall('handleDeleteProduct', { productId })
+                    .then(result => {
+                        showToast(result.message, 'info');
+                        fetchData(); // Recarrega tudo para garantir consistência
+                    })
+                    .catch(err => {
+                        DB.produtos = originalProducts; // Reverte
+                        renderProdutos();
+                        showToast('Falha ao excluir/inativar produto.', 'error', 0);
+                    });
             }
 
             // --- Handlers de Edição de Venda ---
@@ -796,19 +867,17 @@
                 const venda = DB.vendas.find(v => v.Venda_ID === vendaId);
                 if (!venda) return;
 
-                // Popula os campos gerais
                 document.getElementById('sale-id').value = venda.Venda_ID;
                 document.getElementById('sale-name').value = venda.NomeComprador;
                 document.getElementById('sale-date').value = venda.Data;
                 document.getElementById('sale-payment').value = venda.FormaPagamento;
                 document.getElementById('sale-shift').value = venda.Turno;
                 
-                // Popula o carrinho de edição
                 const itemsDaVenda = DB.itens_venda.filter(i => i.Venda_Ref === vendaId);
                 appState.editingSale.items = itemsDaVenda.map(item => {
                     const produtoOriginal = DB.produtos.find(p => p.Produto_ID === item.Produto_Ref) || {};
                     return {
-                        ...produtoOriginal, // Pega o preço e nome mais atual
+                        ...produtoOriginal,
                         Produto_ID: item.Produto_Ref,
                         Nome: item.NomeProduto,
                         Preco: item.PrecoUnitario,
@@ -852,11 +921,9 @@
                     });
                 }
 
-                // Recalcula e exibe o total
                 const total = appState.editingSale.items.reduce((sum, item) => sum + (parseFloat(item.Preco || 0) * item.Quantidade), 0);
                 document.getElementById('sale-modal-total').textContent = formatCurrency(total);
 
-                // Adiciona listeners aos novos botões
                 document.querySelectorAll('.sale-edit-aumentar').forEach(btn => btn.addEventListener('click', (e) => handleSaleEditItemQty(e.target.dataset.id, 1)));
                 document.querySelectorAll('.sale-edit-diminuir').forEach(btn => btn.addEventListener('click', (e) => handleSaleEditItemQty(e.target.dataset.id, -1)));
             }
@@ -885,15 +952,15 @@
                     appState.editingSale.items.push({ ...produto, Quantidade: 1 });
                 }
                 
-                // Remove o item se a quantidade for 0 ou menos
                 appState.editingSale.items = appState.editingSale.items.filter(i => i.Quantidade > 0);
                 
                 renderSaleEditCart();
             }
 
-            async function handleSaveChanges() {
+            function handleSaveChanges() {
                 const saleId = document.getElementById('sale-id').value;
-                const originalVenda = DB.vendas.find(v => v.Venda_ID === saleId);
+                const originalVenda = { ...DB.vendas.find(v => v.Venda_ID === saleId) };
+                const originalItens = [ ...DB.itens_venda.filter(i => i.Venda_Ref === saleId) ];
 
                 const newTotal = appState.editingSale.items.reduce((sum, item) => sum + (parseFloat(item.Preco || 0) * item.Quantidade), 0);
                 
@@ -908,7 +975,7 @@
                 };
 
                 const updatedItems = appState.editingSale.items.map((item, index) => ({
-                    ItemVenda_ID: `I${new Date().getTime()}-${index}`, // Gera novo ID para o item
+                    ItemVenda_ID: `I${new Date().getTime()}-${index}`,
                     Venda_Ref: saleId,
                     Produto_Ref: item.Produto_ID,
                     NomeProduto: item.Nome,
@@ -916,40 +983,50 @@
                     Quantidade: item.Quantidade.toString(),
                     TotalItem: (parseFloat(item.Preco) * item.Quantidade).toFixed(2)
                 }));
+                
+                closeSaleModal();
 
-                try {
-                    await apiCall('updateSale', { saleId, updatedSaleData, updatedItems });
-                    
-                    // Atualiza o DB local para refletir as mudanças
-                    const saleIndex = DB.vendas.findIndex(v => v.Venda_ID === saleId);
-                    DB.vendas[saleIndex] = updatedSaleData;
-                    DB.itens_venda = DB.itens_venda.filter(i => i.Venda_Ref !== saleId); // Remove antigos
-                    DB.itens_venda.push(...updatedItems); // Adiciona novos
+                // UI Otimista
+                const saleIndex = DB.vendas.findIndex(v => v.Venda_ID === saleId);
+                DB.vendas[saleIndex] = updatedSaleData;
+                DB.itens_venda = DB.itens_venda.filter(i => i.Venda_Ref !== saleId);
+                DB.itens_venda.push(...updatedItems);
+                
+                showToast('Venda atualizada!');
+                renderCurrentView();
 
-                    alert('Venda atualizada com sucesso!');
-                    closeSaleModal();
-                    renderCurrentView();
-
-                } catch (error) {
-                    console.error("Falha ao atualizar a venda:", error);
-                }
+                apiCall('updateSale', { saleId, updatedSaleData, updatedItems }, { background: true })
+                    .catch(err => {
+                        DB.vendas[saleIndex] = originalVenda; // Reverte
+                        DB.itens_venda = DB.itens_venda.filter(i => i.Venda_Ref !== saleId);
+                        DB.itens_venda.push(...originalItens);
+                        renderCurrentView();
+                        showToast('Falha ao atualizar venda na nuvem.', 'error', 0);
+                    });
             }
             
-            async function handleDeleteSale() {
-                const vendaId = document.getElementById('sale-id').value;
+            function handleDeleteSale() {
+                const saleId = document.getElementById('sale-id').value;
                 if (!confirm('Tem certeza que deseja excluir esta venda e todos os seus itens? Esta ação não pode ser desfeita.')) return;
-                try {
-                    await apiCall('deleteSale', { saleId: vendaId });
-                    DB.vendas = DB.vendas.filter(v => v.Venda_ID !== vendaId);
-                    DB.itens_venda = DB.itens_venda.filter(i => i.Venda_Ref !== vendaId);
-                    alert('Venda excluída com sucesso.');
-                    closeSaleModal();
-                    renderCurrentView();
-                } catch (error) {
-                    console.error('Falha ao excluir venda', error);
-                    alert(`Erro ao excluir a venda na planilha: ${error.message}. A aplicação será recarregada para garantir a consistência dos dados.`);
-                    window.location.reload();
-                }
+                
+                const originalVenda = { ...DB.vendas.find(v => v.Venda_ID === saleId) };
+                const originalItens = [ ...DB.itens_venda.filter(i => i.Venda_Ref === saleId) ];
+
+                closeSaleModal();
+
+                // UI Otimista
+                DB.vendas = DB.vendas.filter(v => v.Venda_ID !== saleId);
+                DB.itens_venda = DB.itens_venda.filter(i => i.Venda_Ref !== saleId);
+                showToast('Venda excluída.', 'info');
+                renderCurrentView();
+
+                apiCall('deleteSale', { saleId }, { background: true })
+                    .catch(err => {
+                        DB.vendas.push(originalVenda);
+                        DB.itens_venda.push(...originalItens);
+                        renderCurrentView();
+                        showToast('Falha ao excluir venda na nuvem.', 'error', 0);
+                    });
             }
 
             // =================================================================
