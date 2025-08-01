@@ -44,17 +44,18 @@ async function updateRow(sheets, range, values) {
 }
 
 async function findRowById(sheets, sheetName, id, idColumnIndex = 0) {
-    const rows = await getSheetData(sheets, sheetName);
-    const headers = rows.shift();
+    const rows = await getSheetData(sheets, `${sheetName}!A:A`); // Otimizado para buscar apenas a coluna do ID
     for (let i = 0; i < rows.length; i++) {
         if (rows[i][idColumnIndex] === id) {
-            return { rowIndex: i + 2, headers, rowData: rows[i] };
+            // Encontrou o ID, agora busca a linha inteira
+            const fullRow = (await getSheetData(sheets, `${sheetName}!A${i + 1}:${i + 1}`))[0];
+            const headers = (await getSheetData(sheets, `${sheetName}!1:1`))[0];
+            return { rowIndex: i + 1, headers, rowData: fullRow };
         }
     }
     return { rowIndex: -1, headers: null, rowData: null };
 }
 
-// NOVA FUNÇÃO HELPER para obter o ID interno da aba (Sheet ID)
 async function getSheetIdByName(sheets, sheetName) {
     const spreadsheetMeta = await sheets.spreadsheets.get({
         spreadsheetId: SPREADSHEET_ID,
@@ -66,9 +67,8 @@ async function getSheetIdByName(sheets, sheetName) {
     return sheet.properties.sheetId;
 }
 
-async function batchDeleteRows(sheets, requests) {
+async function batchUpdate(sheets, requests) {
     if (requests.length === 0) return;
-    requests.sort((a, b) => b.deleteDimension.range.startIndex - a.deleteDimension.range.startIndex);
     await sheets.spreadsheets.batchUpdate({
         spreadsheetId: SPREADSHEET_ID,
         resource: { requests },
@@ -111,20 +111,66 @@ exports.handler = async (event) => {
           const { novaVenda, itensCarrinho } = payload;
           const vendasHeaders = (await getSheetData(sheets, 'vendas!1:1'))[0];
           const itensHeaders = (await getSheetData(sheets, 'itens_venda!1:1'))[0];
+          
           const vendaRow = vendasHeaders.map(h => novaVenda[h] || '');
           await appendRow(sheets, 'vendas', vendaRow);
+          
           for (const item of itensCarrinho) {
               const itemRow = itensHeaders.map(h => item[h] || '');
               await appendRow(sheets, 'itens_venda', itemRow);
           }
           return { statusCode: 200, body: JSON.stringify({ message: 'Venda salva com sucesso.' }) };
         }
+        
+        case 'updateSale': {
+            const { saleId, updatedSaleData, updatedItems } = payload;
+
+            // 1. Encontrar e apagar os itens antigos da venda
+            const itemsSheetId = await getSheetIdByName(sheets, 'itens_venda');
+            const itemsData = await getSheetData(sheets, 'itens_venda');
+            const itemsHeaders = itemsData.shift();
+            const vendaRefIndex = itemsHeaders.indexOf('Venda_Ref');
+            
+            const deleteRequests = [];
+            itemsData.forEach((row, index) => {
+                if (row[vendaRefIndex] === saleId) {
+                    // rowIndex é index + 2 porque os dados começam da linha 2 e o index é 0-based
+                    const rowIndexToDelete = index + 1;
+                    deleteRequests.push({
+                        deleteDimension: { range: { sheetId: itemsSheetId, dimension: 'ROWS', startIndex: rowIndexToDelete, endIndex: rowIndexToDelete + 1 } }
+                    });
+                }
+            });
+            // Deleta em ordem reversa para não bagunçar os índices
+            deleteRequests.sort((a, b) => b.deleteDimension.range.startIndex - a.deleteDimension.range.startIndex);
+            if(deleteRequests.length > 0) {
+              await batchUpdate(sheets, deleteRequests);
+            }
+
+            // 2. Adicionar os novos itens
+            const newItemsHeaders = (await getSheetData(sheets, 'itens_venda!1:1'))[0];
+            for (const item of updatedItems) {
+                const itemRow = newItemsHeaders.map(h => item[h] || '');
+                await appendRow(sheets, 'itens_venda', itemRow);
+            }
+
+            // 3. Atualizar a linha da venda principal
+            const { rowIndex, headers } = await findRowById(sheets, 'vendas', saleId);
+            if (rowIndex === -1) throw new Error('Venda não encontrada para atualizar.');
+            
+            const saleRow = headers.map(h => updatedSaleData[h] !== undefined ? updatedSaleData[h] : '');
+            await updateRow(sheets, `vendas!A${rowIndex}`, saleRow);
+
+            return { statusCode: 200, body: JSON.stringify({ message: 'Venda atualizada com sucesso.' }) };
+        }
+
         case 'createProduct': {
           const productHeaders = (await getSheetData(sheets, 'produtos!1:1'))[0];
           const productRow = productHeaders.map(h => payload[h] || '');
           await appendRow(sheets, 'produtos', productRow);
           return { statusCode: 200, body: JSON.stringify({ message: 'Produto criado com sucesso.' }) };
         }
+        
         case 'updateProduct': {
           const { rowIndex, headers } = await findRowById(sheets, 'produtos', payload.Produto_ID);
           if (rowIndex === -1) throw new Error('Produto não encontrado.');
@@ -132,13 +178,7 @@ exports.handler = async (event) => {
           await updateRow(sheets, `produtos!A${rowIndex}`, productRow);
           return { statusCode: 200, body: JSON.stringify({ message: 'Produto atualizado com sucesso.' }) };
         }
-        case 'updateSale': {
-            const { rowIndex, headers } = await findRowById(sheets, 'vendas', payload.Venda_ID);
-            if (rowIndex === -1) throw new Error('Venda não encontrada.');
-            const saleRow = headers.map(h => payload[h] !== undefined ? payload[h] : '');
-            await updateRow(sheets, `vendas!A${rowIndex}`, saleRow);
-            return { statusCode: 200, body: JSON.stringify({ message: 'Venda atualizada com sucesso.' }) };
-        }
+        
         case 'handleDeleteProduct': {
             const { productId } = payload;
             const itensVendaData = await getSheetData(sheets, 'itens_venda');
@@ -147,6 +187,7 @@ exports.handler = async (event) => {
             const isProductSold = itensVendaData.some(row => row[produtoRefIndex] === productId);
             const { rowIndex, headers, rowData } = await findRowById(sheets, 'produtos', productId);
             if (rowIndex === -1) throw new Error('Produto não encontrado para apagar.');
+            
             if (isProductSold) {
                 const statusIndex = headers.indexOf('Status');
                 if (statusIndex === -1) throw new Error("Coluna 'Status' não encontrada.");
@@ -156,16 +197,19 @@ exports.handler = async (event) => {
                 return { statusCode: 200, body: JSON.stringify({ message: 'Produto inativado pois possui histórico de vendas.' }) };
             } else {
                 const productSheetId = await getSheetIdByName(sheets, 'produtos');
-                await batchDeleteRows(sheets, [{ deleteDimension: { range: { sheetId: productSheetId, dimension: 'ROWS', startIndex: rowIndex - 1, endIndex: rowIndex } } }]);
+                await batchUpdate(sheets, [{ deleteDimension: { range: { sheetId: productSheetId, dimension: 'ROWS', startIndex: rowIndex - 1, endIndex: rowIndex } } }]);
                 return { statusCode: 200, body: JSON.stringify({ message: 'Produto excluído permanentemente.' }) };
             }
         }
+        
         case 'deleteSale': {
             const { saleId } = payload;
-            let deleteRequests = [];
             const salesSheetId = await getSheetIdByName(sheets, 'vendas');
             const itemsSheetId = await getSheetIdByName(sheets, 'itens_venda');
 
+            let deleteRequests = [];
+
+            // Deletar da aba 'vendas'
             const { rowIndex: saleRowIndex } = await findRowById(sheets, 'vendas', saleId);
             if (saleRowIndex > -1) {
                 deleteRequests.push({
@@ -173,22 +217,29 @@ exports.handler = async (event) => {
                 });
             }
 
-            const itemsData = await getSheetData(sheets, 'itens_venda');
-            const itemsHeaders = itemsData.shift();
-            const vendaRefIndex = itemsHeaders.indexOf('Venda_Ref');
+            // Deletar da aba 'itens_venda'
+            const allItemsData = await getSheetData(sheets, 'itens_venda');
+            const allItemsHeaders = allItemsData.shift();
+            const saleRefIndex = allItemsHeaders.indexOf('Venda_Ref');
             
-            itemsData.forEach((row, index) => {
-                if (row[vendaRefIndex] === saleId) {
-                    const rowIndexToDelete = index + 2;
+            allItemsData.forEach((row, index) => {
+                if (row[saleRefIndex] === saleId) {
+                    const rowIndexToDelete = index + 1; // +1 porque o sheet é 1-based e o index é 0-based
                     deleteRequests.push({
-                        deleteDimension: { range: { sheetId: itemsSheetId, dimension: 'ROWS', startIndex: rowIndexToDelete - 1, endIndex: rowIndexToDelete } }
+                        deleteDimension: { range: { sheetId: itemsSheetId, dimension: 'ROWS', startIndex: rowIndexToDelete, endIndex: rowIndexToDelete + 1 } }
                     });
                 }
             });
+            
+            deleteRequests.sort((a, b) => b.deleteDimension.range.startIndex - a.deleteDimension.range.startIndex);
 
-            await batchDeleteRows(sheets, deleteRequests);
+            if(deleteRequests.length > 0) {
+              await batchUpdate(sheets, deleteRequests);
+            }
+
             return { statusCode: 200, body: JSON.stringify({ message: 'Venda e itens associados foram excluídos.' }) };
         }
+        
         default:
           throw new Error('Ação desconhecida.');
       }

@@ -13,13 +13,11 @@
         .nav-button.active { background-color: #f97316; color: white; }
         .nav-button { transition: all 0.2s ease-in-out; text-align: left; }
         .modal-overlay { transition: opacity 0.2s ease-in-out; }
-        .sort-button.active { background-color: #ea580c; color: white; }
-        .history-filter-btn.active { background-color: #f97316; color: white; border-color: #f97316; }
-        /* Estilo para a barra de rolagem no painel de produtos */
-        #lista-produtos-venda::-webkit-scrollbar { width: 8px; }
-        #lista-produtos-venda::-webkit-scrollbar-track { background: #f1f5f9; }
-        #lista-produtos-venda::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        #lista-produtos-venda::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        /* Scrollbar customizado */
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 </head>
 <body class="bg-stone-100 text-stone-800">
@@ -72,7 +70,7 @@
                      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-md">
                             <h2 class="text-2xl font-bold mb-4">Produtos Disponíveis</h2>
-                            <div id="lista-produtos-venda" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto p-2">
+                            <div id="lista-produtos-venda" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto p-2 custom-scrollbar">
                             </div>
                         </div>
                         <div class="bg-white p-6 rounded-xl shadow-md flex flex-col">
@@ -90,7 +88,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div id="carrinho-itens" class="space-y-2 mb-4 flex-grow overflow-y-auto">
+                            <div id="carrinho-itens" class="space-y-2 mb-4 flex-grow overflow-y-auto custom-scrollbar">
                                 <p class="text-stone-500 text-center pt-8">Carrinho vazio.</p>
                             </div>
                             <div class="border-t pt-4">
@@ -121,11 +119,10 @@
                     </div>
                 </section>
 
-                <!-- Seção 4: Histórico (LAYOUT ATUALIZADO) -->
+                <!-- Seção 4: Histórico -->
                 <section id="historico" class="view hidden">
                     <h2 class="text-2xl font-bold mb-4">Histórico de Vendas</h2>
                     
-                    <!-- Filtros -->
                     <div id="historico-filtros" class="mb-6 bg-white p-4 rounded-xl shadow-md">
                         <div class="flex flex-wrap items-center gap-4">
                             <div>
@@ -143,10 +140,8 @@
                         </div>
                     </div>
 
-                    <!-- Resumo do Período -->
                     <div id="historico-resumo" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"></div>
 
-                    <!-- Display de Vendas (Lista Compacta) -->
                     <div id="historico-vendas-display" class="bg-white rounded-xl shadow-md overflow-hidden">
                         <p class="text-center text-stone-500 p-10">Selecione um período para ver as vendas.</p>
                     </div>
@@ -158,7 +153,7 @@
     <!-- Modal de Edição/Criação de Produto -->
     <div id="product-modal" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
         <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
-            <h2 id="product-modal-title" class="text-2xl font-bold mb-4">Editar Produto</h2>
+            <h2 id="product-modal-title" class="text-2xl font-bold mb-4"></h2>
             <form id="product-form">
                 <input type="hidden" id="product-id">
                 <div class="space-y-4">
@@ -190,47 +185,68 @@
         </div>
     </div>
 
-    <!-- Modal de Edição de Venda -->
-    <div id="sale-modal" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
-        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
-            <h2 id="sale-modal-title" class="text-2xl font-bold mb-4">Editar Venda</h2>
-            <form id="sale-form">
-                <input type="hidden" id="sale-id">
-                <div class="space-y-4">
-                    <div>
-                        <label for="sale-name" class="block text-sm font-medium text-stone-700">Nome do Comprador</label>
-                        <input type="text" id="sale-name" required class="mt-1 block w-full px-3 py-2 bg-stone-100 border border-stone-300 rounded-md shadow-sm">
+    <!-- Modal de Edição de Venda (NOVO LAYOUT) -->
+    <div id="sale-modal" class="modal-overlay fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div class="p-6 border-b">
+                <h2 id="sale-modal-title" class="text-2xl font-bold">Editar Venda</h2>
+            </div>
+            <form id="sale-form" class="flex-grow grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 overflow-y-auto">
+                <!-- Coluna de Produtos -->
+                <div class="lg:col-span-1 flex flex-col">
+                    <h3 class="text-lg font-bold mb-2">Adicionar Produtos</h3>
+                    <div id="sale-modal-products" class="flex-grow space-y-2 overflow-y-auto custom-scrollbar border rounded-lg p-2 bg-stone-50">
+                        <!-- Lista de produtos será inserida aqui -->
                     </div>
-                    <div>
-                        <label for="sale-date" class="block text-sm font-medium text-stone-700">Data</label>
-                        <input type="date" id="sale-date" required class="mt-1 block w-full px-3 py-2 bg-stone-100 border border-stone-300 rounded-md shadow-sm">
-                    </div>
-                    <div>
-                        <label for="sale-payment" class="block text-sm font-medium text-stone-700">Forma de Pagamento</label>
-                        <select id="sale-payment" class="mt-1 block w-full px-3 py-2 bg-stone-100 border border-stone-300 rounded-md shadow-sm">
-                            <option>PIX</option>
-                            <option>Dinheiro</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="sale-shift" class="block text-sm font-medium text-stone-700">Turno</label>
-                        <select id="sale-shift" class="mt-1 block w-full px-3 py-2 bg-stone-100 border border-stone-300 rounded-md shadow-sm">
-                            <option>Manhã</option>
-                            <option>Noite</option>
-                        </select>
-                    </div>
-                    <p class="text-sm text-stone-600">Nota: A edição dos itens individuais da venda não é suportada.</p>
                 </div>
-                <div class="mt-6 flex justify-between items-center">
-                    <button type="button" id="delete-sale-btn" class="p-2 rounded-full hover:bg-red-100" title="Excluir Venda">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-600" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
-                    </button>
-                    <div class="flex gap-3">
-                        <button type="button" id="cancel-sale-modal" class="px-4 py-2 bg-stone-200 text-stone-800 font-semibold rounded-lg hover:bg-stone-300">Cancelar</button>
-                        <button type="submit" class="px-4 py-2 bg-orange-500 text-white font-semibold rounded-lg hover:bg-orange-600">Salvar Alterações</button>
+                <!-- Coluna de Detalhes e Carrinho -->
+                <div class="lg:col-span-2 flex flex-col">
+                    <input type="hidden" id="sale-id">
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="sale-name" class="block text-sm font-medium text-stone-700">Nome do Comprador</label>
+                            <input type="text" id="sale-name" required class="mt-1 block w-full px-3 py-2 bg-stone-100 border border-stone-300 rounded-md shadow-sm">
+                        </div>
+                        <div>
+                            <label for="sale-date" class="block text-sm font-medium text-stone-700">Data</label>
+                            <input type="date" id="sale-date" required class="mt-1 block w-full px-3 py-2 bg-stone-100 border border-stone-300 rounded-md shadow-sm">
+                        </div>
+                        <div>
+                            <label for="sale-payment" class="block text-sm font-medium text-stone-700">Forma de Pagamento</label>
+                            <select id="sale-payment" class="mt-1 block w-full px-3 py-2 bg-stone-100 border border-stone-300 rounded-md shadow-sm">
+                                <option>PIX</option>
+                                <option>Dinheiro</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="sale-shift" class="block text-sm font-medium text-stone-700">Turno</label>
+                            <select id="sale-shift" class="mt-1 block w-full px-3 py-2 bg-stone-100 border border-stone-300 rounded-md shadow-sm">
+                                <option>Manhã</option>
+                                <option>Noite</option>
+                            </select>
+                        </div>
+                    </div>
+                    <h3 class="text-lg font-bold mb-2">Itens da Venda</h3>
+                    <div id="sale-modal-cart" class="flex-grow space-y-2 overflow-y-auto custom-scrollbar border rounded-lg p-2 bg-stone-50">
+                        <!-- Carrinho de edição será inserido aqui -->
                     </div>
                 </div>
             </form>
+            <div class="p-6 border-t flex justify-between items-center bg-stone-50">
+                <button type="button" id="delete-sale-btn" class="p-2 rounded-full hover:bg-red-100" title="Excluir Venda">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-600" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
+                </button>
+                <div class="flex items-center gap-6">
+                    <div class="font-bold text-xl">
+                        <span>Total:</span>
+                        <span id="sale-modal-total">R$ 0,00</span>
+                    </div>
+                    <div class="flex gap-3">
+                        <button type="button" id="cancel-sale-modal" class="px-6 py-2 bg-stone-200 text-stone-800 font-semibold rounded-lg hover:bg-stone-300">Cancelar</button>
+                        <button type="button" id="save-sale-changes-btn" class="px-6 py-2 bg-orange-500 text-white font-semibold rounded-lg hover:bg-orange-600">Salvar Alterações</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -262,7 +278,10 @@
                 historicoFiltro: {
                     ano: null,
                     mes: null,
-                    semana: null, // 'null' para todas as semanas
+                    semana: null,
+                },
+                editingSale: {
+                    items: [],
                 }
             };
 
@@ -489,7 +508,6 @@
             function getWeekInfo(date) {
                 const d = new Date(date.getTime());
                 d.setHours(0, 0, 0, 0);
-                // Domingo é 0, Sábado é 6. Ajustamos para que a semana comece no domingo.
                 const dayOfWeek = d.getDay();
                 const startDate = new Date(d);
                 startDate.setDate(d.getDate() - dayOfWeek);
@@ -560,7 +578,6 @@
                     return anoMatch && mesMatch && semanaMatch;
                 }).sort((a, b) => new Date(b.TimestampVenda) - new Date(a.TimestampVenda));
 
-                // Calcular e renderizar resumo
                 const totalPeriodo = vendasFiltradas.reduce((sum, v) => sum + parseFloat(v.TotalVenda || 0), 0);
                 const totalPixPeriodo = vendasFiltradas.filter(v => v.FormaPagamento === 'PIX').reduce((sum, v) => sum + parseFloat(v.TotalVenda || 0), 0);
                 const totalDinheiroPeriodo = vendasFiltradas.filter(v => v.FormaPagamento === 'Dinheiro').reduce((sum, v) => sum + parseFloat(v.TotalVenda || 0), 0);
@@ -585,7 +602,6 @@
                     return;
                 }
 
-                // Renderizar como tabela compacta
                 const table = document.createElement('table');
                 table.className = 'w-full text-sm text-left text-stone-500';
                 table.innerHTML = `
@@ -775,46 +791,150 @@
                 }
             }
 
-            // --- Handlers de Venda (Edição/Exclusão) ---
+            // --- Handlers de Edição de Venda ---
             function openSaleModal(vendaId) {
                 const venda = DB.vendas.find(v => v.Venda_ID === vendaId);
                 if (!venda) return;
+
+                // Popula os campos gerais
                 document.getElementById('sale-id').value = venda.Venda_ID;
                 document.getElementById('sale-name').value = venda.NomeComprador;
                 document.getElementById('sale-date').value = venda.Data;
                 document.getElementById('sale-payment').value = venda.FormaPagamento;
                 document.getElementById('sale-shift').value = venda.Turno;
+                
+                // Popula o carrinho de edição
+                const itemsDaVenda = DB.itens_venda.filter(i => i.Venda_Ref === vendaId);
+                appState.editingSale.items = itemsDaVenda.map(item => {
+                    const produtoOriginal = DB.produtos.find(p => p.Produto_ID === item.Produto_Ref) || {};
+                    return {
+                        ...produtoOriginal, // Pega o preço e nome mais atual
+                        Produto_ID: item.Produto_Ref,
+                        Nome: item.NomeProduto,
+                        Preco: item.PrecoUnitario,
+                        Quantidade: parseInt(item.Quantidade)
+                    }
+                });
+                
+                renderSaleEditCart();
+                renderSaleEditProductList();
                 document.getElementById('sale-modal').classList.remove('hidden');
             }
 
             function closeSaleModal() {
+                appState.editingSale.items = [];
                 document.getElementById('sale-modal').classList.add('hidden');
             }
+
+            function renderSaleEditCart() {
+                const cartContainer = document.getElementById('sale-modal-cart');
+                cartContainer.innerHTML = '';
+
+                if (appState.editingSale.items.length === 0) {
+                    cartContainer.innerHTML = '<p class="text-stone-500 text-center p-4">Nenhum item na venda.</p>';
+                } else {
+                    appState.editingSale.items.forEach(item => {
+                        const itemEl = document.createElement('div');
+                        itemEl.className = 'flex items-center justify-between p-2 rounded-md hover:bg-stone-100';
+                        const precoTotalItem = parseFloat(item.Preco || 0) * item.Quantidade;
+                        itemEl.innerHTML = `
+                            <div>
+                                <p class="font-semibold">${item.Nome}</p>
+                                <p class="text-sm text-stone-500">${formatCurrency(precoTotalItem)}</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" data-id="${item.Produto_ID}" class="sale-edit-diminuir bg-stone-200 w-7 h-7 rounded-full font-bold hover:bg-red-200">-</button>
+                                <span>${item.Quantidade}</span>
+                                <button type="button" data-id="${item.Produto_ID}" class="sale-edit-aumentar bg-stone-200 w-7 h-7 rounded-full font-bold hover:bg-green-200">+</button>
+                            </div>
+                        `;
+                        cartContainer.appendChild(itemEl);
+                    });
+                }
+
+                // Recalcula e exibe o total
+                const total = appState.editingSale.items.reduce((sum, item) => sum + (parseFloat(item.Preco || 0) * item.Quantidade), 0);
+                document.getElementById('sale-modal-total').textContent = formatCurrency(total);
+
+                // Adiciona listeners aos novos botões
+                document.querySelectorAll('.sale-edit-aumentar').forEach(btn => btn.addEventListener('click', (e) => handleSaleEditItemQty(e.target.dataset.id, 1)));
+                document.querySelectorAll('.sale-edit-diminuir').forEach(btn => btn.addEventListener('click', (e) => handleSaleEditItemQty(e.target.dataset.id, -1)));
+            }
             
-            async function handleSaleFormSubmit(e) {
-                e.preventDefault();
-                const vendaId = document.getElementById('sale-id').value;
-                const payload = {
-                    Venda_ID: vendaId,
+            function renderSaleEditProductList() {
+                const productContainer = document.getElementById('sale-modal-products');
+                productContainer.innerHTML = '';
+                DB.produtos.filter(p => p.Status === 'Ativo').forEach(produto => {
+                    const produtoEl = document.createElement('div');
+                    produtoEl.className = 'flex justify-between items-center p-2 cursor-pointer hover:bg-orange-100 rounded-lg';
+                    produtoEl.innerHTML = `
+                        <span>${produto.Nome}</span>
+                        <span class="font-semibold">${formatCurrency(produto.Preco)}</span>
+                    `;
+                    produtoEl.addEventListener('click', () => handleSaleEditItemQty(produto.Produto_ID, 1));
+                    productContainer.appendChild(produtoEl);
+                });
+            }
+
+            function handleSaleEditItemQty(productId, delta) {
+                let item = appState.editingSale.items.find(i => i.Produto_ID === productId);
+                if (item) {
+                    item.Quantidade += delta;
+                } else if (delta > 0) {
+                    const produto = DB.produtos.find(p => p.Produto_ID === productId);
+                    appState.editingSale.items.push({ ...produto, Quantidade: 1 });
+                }
+                
+                // Remove o item se a quantidade for 0 ou menos
+                appState.editingSale.items = appState.editingSale.items.filter(i => i.Quantidade > 0);
+                
+                renderSaleEditCart();
+            }
+
+            async function handleSaveChanges() {
+                const saleId = document.getElementById('sale-id').value;
+                const originalVenda = DB.vendas.find(v => v.Venda_ID === saleId);
+
+                const newTotal = appState.editingSale.items.reduce((sum, item) => sum + (parseFloat(item.Preco || 0) * item.Quantidade), 0);
+                
+                const updatedSaleData = {
+                    ...originalVenda,
                     NomeComprador: document.getElementById('sale-name').value,
                     Data: document.getElementById('sale-date').value,
                     FormaPagamento: document.getElementById('sale-payment').value,
                     Turno: document.getElementById('sale-shift').value,
-                    Ano: new Date(document.getElementById('sale-date').value).getFullYear().toString()
+                    Ano: new Date(document.getElementById('sale-date').value).getFullYear().toString(),
+                    TotalVenda: newTotal.toFixed(2)
                 };
 
+                const updatedItems = appState.editingSale.items.map((item, index) => ({
+                    ItemVenda_ID: `I${new Date().getTime()}-${index}`, // Gera novo ID para o item
+                    Venda_Ref: saleId,
+                    Produto_Ref: item.Produto_ID,
+                    NomeProduto: item.Nome,
+                    PrecoUnitario: parseFloat(item.Preco).toFixed(2),
+                    Quantidade: item.Quantidade.toString(),
+                    TotalItem: (parseFloat(item.Preco) * item.Quantidade).toFixed(2)
+                }));
+
                 try {
-                    await apiCall('updateSale', payload);
-                    const index = DB.vendas.findIndex(v => v.Venda_ID === vendaId);
-                    DB.vendas[index] = { ...DB.vendas[index], ...payload };
+                    await apiCall('updateSale', { saleId, updatedSaleData, updatedItems });
+                    
+                    // Atualiza o DB local para refletir as mudanças
+                    const saleIndex = DB.vendas.findIndex(v => v.Venda_ID === saleId);
+                    DB.vendas[saleIndex] = updatedSaleData;
+                    DB.itens_venda = DB.itens_venda.filter(i => i.Venda_Ref !== saleId); // Remove antigos
+                    DB.itens_venda.push(...updatedItems); // Adiciona novos
+
                     alert('Venda atualizada com sucesso!');
                     closeSaleModal();
                     renderCurrentView();
+
                 } catch (error) {
-                    console.error('Falha ao atualizar venda', error);
+                    console.error("Falha ao atualizar a venda:", error);
                 }
             }
-
+            
             async function handleDeleteSale() {
                 const vendaId = document.getElementById('sale-id').value;
                 if (!confirm('Tem certeza que deseja excluir esta venda e todos os seus itens? Esta ação não pode ser desfeita.')) return;
@@ -862,13 +982,13 @@
             // Histórico Listeners
             document.getElementById('filtro-ano').addEventListener('change', (e) => {
                 appState.historicoFiltro.ano = parseInt(e.target.value);
-                appState.historicoFiltro.semana = null; // Reset week
+                appState.historicoFiltro.semana = null;
                 renderWeekFilters();
                 displayHistoricoVendas();
             });
             document.getElementById('filtro-mes').addEventListener('change', (e) => {
                 appState.historicoFiltro.mes = parseInt(e.target.value);
-                appState.historicoFiltro.semana = null; // Reset week
+                appState.historicoFiltro.semana = null;
                 renderWeekFilters();
                 displayHistoricoVendas();
             });
@@ -877,7 +997,8 @@
                 displayHistoricoVendas();
             });
 
-            document.getElementById('sale-form').addEventListener('submit', handleSaleFormSubmit);
+            // Modal de Edição de Venda Listeners
+            document.getElementById('save-sale-changes-btn').addEventListener('click', handleSaveChanges);
             document.getElementById('cancel-sale-modal').addEventListener('click', closeSaleModal);
             document.getElementById('delete-sale-btn').addEventListener('click', handleDeleteSale);
 
